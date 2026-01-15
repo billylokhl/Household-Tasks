@@ -180,7 +180,7 @@ function getTimeSpentData(isDarkMode) {
 
     const catTotals = {};
     for (let i = 1; i < data.length; i++) {
-      const c = String(data[i][catIdx] || "General").trim();
+      const c = String(data[i][catIdx] || "Uncategorized").trim();
       catTotals[c] = (catTotals[c] || 0) + parseTimeValue(data[i][ectIdx]);
     }
     const sortedCats = Object.keys(catTotals).sort((a,b) => catTotals[b] - catTotals[a]);
@@ -211,7 +211,7 @@ function getTimeSpentData(isDarkMode) {
       const isBilly = (row[billyIdx] === true || String(row[billyIdx]).toUpperCase() === "TRUE");
       const isKaren = (row[karenIdx] === true || String(row[karenIdx]).toUpperCase() === "TRUE");
       const mins = parseTimeValue(row[ectIdx]);
-      const rawCat = String(row[catIdx] || "General").trim();
+      const rawCat = String(row[catIdx] || "Uncategorized").trim();
       let displayCat = topCats.includes(rawCat) ? rawCat : "Other";
 
       if (mins > 0) {
