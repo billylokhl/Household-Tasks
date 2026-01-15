@@ -42,52 +42,6 @@ function showTimeTrendModal() {
 }
 
 /**
- * DATA BRIDGE: Incident Data
- * Logic: Checks red background or "INC" status + owner emojis in notes.
- */
-function getIncidentTrendData() {
-  const sheet = SS.getSheetByName("TaskHistory");
-  if (!sheet) return { error: "TaskHistory sheet not found" };
-  const range = sheet.getDataRange();
-  const data = range.getValues();
-  const backgrounds = range.getBackgrounds();
-  const notes = range.getNotes();
-  const headers = data[0];
-  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  const targetRed = "#ea9999";
-  let res = { pig: [["Date", "Incidents"]], cat: [["Date", "Incidents"]], details: { pig: [], cat: [] } };
-  let dailyRaw = [];
-
-  for (let col = 2; col < headers.length; col++) {
-    let pDay = 0, cDay = 0;
-    let dateObj = headers[col];
-    if (!(dateObj instanceof Date)) continue;
-    let dateStr = (dateObj.getMonth() + 1) + "/" + dateObj.getDate() + " (" + dayNames[dateObj.getDay()] + ")";
-
-    for (let r = 1; r < data.length; r++) {
-      if (backgrounds[r][col] === targetRed || data[r][col] === "INC") {
-        const ownerNote = notes[r][col] || "";
-        const isBilly = ownerNote.includes("🐷");
-        const isKaren = ownerNote.includes("🐱");
-        let taskDetail = { date: dateStr, cat: data[r][0] || "Misc", task: data[r][1] || "Unnamed" };
-        if (isBilly) { pDay++; res.details.pig.push(taskDetail); }
-        if (isKaren) { cDay++; res.details.cat.push(taskDetail); }
-      }
-    }
-    dailyRaw.push({ label: dateStr, p: pDay, c: cDay });
-  }
-  dailyRaw.reverse();
-  for (let i = 0; i < dailyRaw.length; i++) {
-    let pSum = 0, cSum = 0;
-    let start = Math.max(0, i - 13);
-    for (let j = start; j <= i; j++) { pSum += dailyRaw[j].p; cSum += dailyRaw[j].c; }
-    res.pig.push([dailyRaw[i].label, pSum]);
-    res.cat.push([dailyRaw[i].label, cSum]);
-  }
-  return res;
-}
-
-/**
  * HELPERS: Row and Column Finders (Critical for MatrixEngine)
  */
 function findTaskRowInHistory(category, taskName) {
