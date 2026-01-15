@@ -163,151 +163,98 @@ function parseTimeValue(val) {
   return num;
 }
 
-/** * UPDATED TIME TREND
- * Uses CompletionDate if available, otherwise fallback to Sync Date.
- */
+/** TIME TREND ENGINE (FIXED TOOLTIP CONTRAST) **/
 function getTimeSpentData(isDarkMode) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const archive = ss.getSheetByName("TaskArchive");
-    if (!archive) return { error: "No TaskArchive found. Run Sync first." };
-
+    if (!archive) return { error: "Archive missing." };
     const data = archive.getDataRange().getValues();
     const headers = data[0];
-    const getIdx = (t) => headers.findIndex(h => String(h).toLowerCase().split('!').pop().replace(/'/g, "") === t.toLowerCase());
+    const getIdx = (t) => headers.findIndex(h => String(h).toLowerCase() === t.toLowerCase());
 
-    // Attempt to map new named-range style headers or fallback to old ones
-    // Old: OwnershipBilly -> New: Owner contains 'pig' or check specific col?
-    // Snippet had: const ownerIdx = getIdx("Owner");
-    // Old: const billyIdx = getIdx("OwnershipBilly")
+    const billyIdx = getIdx("OwnershipBilly"), karenIdx = getIdx("OwnershipKaren");
+    let ectIdx = getIdx("ECT");
+    if (ectIdx === -1) ectIdx = getIdx("TimeSpent"); // Fallback if ECT is missing
+    const catIdx = getIdx("Category"), compIdx = getIdx("CompletionDate");
 
-    // If we use the snippet logic strictly:
-    let ownerIdx = getIdx("Owner");
-    if (ownerIdx === -1) ownerIdx = getIdx("OwnershipBilly"); // Try fallback or maybe Ownership
-
-    // Wait, the snippet "executeFullServerSync" creates headers based on Named Ranges in Prioritization.
-    // So "TaskArchive" headers will be "Sync Date", then sorted Named Ranges.
-    // If User has Named Range "Owner", then heading is "Owner".
-    // If User has "OwnershipBilly" and "OwnershipKaren" separately, we need to handle that.
-
-    // User said "Start from the following version...". The snippet implies we ARE using that version's logic.
-    // So let's use the provided getTimeSpentData.
-
-    const timeIdx = getIdx("TimeSpent") !== -1 ? getIdx("TimeSpent") : getIdx("ECT"); // Fallback
-    const catIdx = getIdx("Category");
-    const compIdx = getIdx("CompletionDate");
-    const syncDateIdx = 0;
-
-    let categorySet = new Set();
+    const catTotals = {};
     for (let i = 1; i < data.length; i++) {
-      let c = data[i][catIdx];
-      if (c && String(c).trim() !== "") categorySet.add(String(c).trim());
+      const c = String(data[i][catIdx] || "General").trim();
+      catTotals[c] = (catTotals[c] || 0) + parseTimeValue(data[i][ectIdx]);
     }
-    const categories = Array.from(categorySet).sort();
-    if (categories.length === 0) categories.push("Uncategorized");
+    const sortedCats = Object.keys(catTotals).sort((a,b) => catTotals[b] - catTotals[a]);
+    const topCats = sortedCats.slice(0, 10);
+    const finalCategories = sortedCats.length > 10 ? [...topCats, "Other"] : topCats;
 
     const tz = ss.getSpreadsheetTimeZone();
     const timelineLabels = [];
-    const timelineData = { pig: {}, cat: {} };
+    const timelineData = { Billy: {}, Karen: {} };
 
     for (let i = 29; i >= 0; i--) {
-      let d = new Date();
-      d.setDate(d.getDate() - i);
-      let label = Utilities.formatDate(d, tz, "M/d (E)");
+      let d = new Date(); d.setDate(d.getDate() - i);
+      let label = Utilities.formatDate(d, tz, "MM/dd (E)");
       timelineLabels.push(label);
-      timelineData.pig[label] = { total: 0 };
-      timelineData.cat[label] = { total: 0 };
-      categories.forEach(c => { timelineData.pig[label][c] = 0; timelineData.cat[label][c] = 0; });
+      ["Billy", "Karen"].forEach(p => {
+        timelineData[p][label] = { total: 0, catBreakdown: {} };
+        finalCategories.forEach(c => timelineData[p][label][c] = 0);
+      });
     }
 
-    let rowsProcessed = 0;
     for (let i = 1; i < data.length; i++) {
       const row = data[i];
+      const compDate = safeParseDate(row[compIdx]);
+      if (!compDate) continue;
+      const label = Utilities.formatDate(compDate, tz, "MM/dd (E)");
+      if (!timelineData.Billy[label]) continue;
 
-      let rawDate = row[compIdx] !== undefined ? row[compIdx] : row[syncDateIdx];
-      let dateObj = (rawDate instanceof Date) ? rawDate : new Date(rawDate);
+      const isBilly = (row[billyIdx] === true || String(row[billyIdx]).toUpperCase() === "TRUE");
+      const isKaren = (row[karenIdx] === true || String(row[karenIdx]).toUpperCase() === "TRUE");
+      const mins = parseTimeValue(row[ectIdx]);
+      const rawCat = String(row[catIdx] || "General").trim();
+      let displayCat = topCats.includes(rawCat) ? rawCat : "Other";
 
-      if (isNaN(dateObj.getTime())) continue;
-      const rowLabel = Utilities.formatDate(dateObj, tz, "M/d (E)");
-
-      if (timelineData.pig[rowLabel]) {
-        // Determine Owner.
-        // Snippet logic: const ownerKey = String(row[ownerIdx] || "").toLowerCase().includes("cat") ? "cat" : "pig";
-        // My Logic: Check available columns/values.
-
-        let isPig = false, isCat = false;
-
-        if (ownerIdx !== -1) {
-           const val = String(row[ownerIdx] || "").toLowerCase();
-           if (val.includes("cat") || val.includes("karen")) isCat = true;
-           else isPig = true; // Default to pig if not cat? Or strict check? Snippet defaults to pig.
-        } else {
-           // Fallback for old column names
-           const bIdx = getIdx("OwnershipBilly");
-           const kIdx = getIdx("OwnershipKaren");
-           if (bIdx !== -1 && (row[bIdx] === true || String(row[bIdx]).toUpperCase() === "TRUE")) isPig = true;
-           if (kIdx !== -1 && (row[kIdx] === true || String(row[kIdx]).toUpperCase() === "TRUE")) isCat = true;
+      if (mins > 0) {
+        if (isBilly) {
+          timelineData.Billy[label][displayCat] += mins;
+          timelineData.Billy[label].total += mins;
+          timelineData.Billy[label].catBreakdown[rawCat] = (timelineData.Billy[label].catBreakdown[rawCat] || 0) + mins;
         }
-
-        const cat = String(row[catIdx] || "Uncategorized").trim();
-        const mins = parseTimeValue(row[timeIdx]);
-
-        if (mins > 0) {
-          if (isPig) {
-              timelineData.pig[rowLabel][cat] = (timelineData.pig[rowLabel][cat] || 0) + mins;
-              timelineData.pig[rowLabel].total += mins;
-          }
-           if (isCat) {
-              timelineData.cat[rowLabel][cat] = (timelineData.cat[rowLabel][cat] || 0) + mins;
-              timelineData.cat[rowLabel].total += mins;
-          }
-          if (isPig || isCat) rowsProcessed++;
+        if (isKaren) {
+          timelineData.Karen[label][displayCat] += mins;
+          timelineData.Karen[label].total += mins;
+          timelineData.Karen[label].catBreakdown[rawCat] = (timelineData.Karen[label].catBreakdown[rawCat] || 0) + mins;
         }
       }
     }
 
-    const results = { pig: [], cat: [] };
+    const buildArray = (p) => {
+      let header = ["Day"];
+      finalCategories.forEach(c => { header.push(c); header.push({ type: 'string', role: 'tooltip', p: {html: true} }); });
+      let arr = [header];
 
-    // Helper to build rows for Google Charts
-    const buildRows = (ow) => {
-        let headerRow = ["Day", ...categories, { type: 'string', role: 'tooltip', p: {html: true} }]; // Added tooltip role back
-        let rows = [headerRow];
+      const ttBg = isDarkMode ? "#1e293b" : "#ffffff";
+      const ttText = isDarkMode ? "#f1f5f9" : "#334155";
+      const ttBorder = isDarkMode ? "#334155" : "#cccccc";
 
-        const ttBg = isDarkMode ? "#1e293b" : "#ffffff";
-        const ttText = isDarkMode ? "#f1f5f9" : "#334155";
-        const ttBorder = isDarkMode ? "#334155" : "#cccccc";
+      timelineLabels.forEach(lb => {
+        const dayData = timelineData[p][lb];
+        let tooltip = `<div style="padding:12px; background:${ttBg}; color:${ttText}; border:1px solid ${ttBorder}; font-family:sans-serif; min-width:200px; border-radius:4px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.5);">` +
+                      `<table style="width:100%; font-size:12px; border-collapse:collapse;">`;
 
-        timelineLabels.forEach(label => {
-            let chartRow = [label];
-            categories.forEach(c => chartRow.push(timelineData[ow][label][c] || 0));
-
-            // Re-create HTML tooltip since TimeTrendUI expects it (isHtml: true)
-            let total = timelineData[ow][label].total;
-            let tooltip = `<div style="padding:12px; background:${ttBg}; color:${ttText}; border:1px solid ${ttBorder}; font-family:sans-serif; min-width:200px; border-radius:4px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.5);">` +
-                          `<table style="width:100%; font-size:12px; border-collapse:collapse;">`;
-
-            // Add breakdown
-            categories.forEach(c => {
-                 let val = timelineData[ow][label][c];
-                 if (val > 0) {
-                     tooltip += `<tr><td style="padding:2px 0;">${c}:</td><td style="text-align:right; padding:2px 0 2px 10px;"><b>${val}m</b></td></tr>`;
-                 }
-            });
-            tooltip += `<tr style="border-top:1px solid ${ttBorder};"><td style="padding-top:8px;"><b>TOTAL:</b></td><td style="text-align:right; padding-top:8px;"><b>${total}m</b></td></tr></table></div>`;
-
-            chartRow.push(tooltip);
-            rows.push(chartRow);
+        Object.entries(dayData.catBreakdown).sort((a,b) => b[1] - a[1]).forEach(([c, m]) => {
+            tooltip += `<tr><td style="padding:2px 0;">${c}:</td><td style="text-align:right; padding:2px 0 2px 10px;"><b>${m}m</b></td></tr>`;
         });
-        return rows;
-    };
 
-    // Return format expected by TimeTrendUI.html: { dataA: ..., dataB: ... }
-    return {
-        dataA: buildRows('pig'),
-        dataB: buildRows('cat'),
-        ownerNames: ["🐷", "🐱"]
-    };
+        tooltip += `<tr style="border-top:1px solid ${ttBorder};"><td style="padding-top:8px;"><b>TOTAL:</b></td><td style="text-align:right; padding-top:8px;"><b>${dayData.total}m</b></td></tr></table></div>`;
 
+        let row = [lb];
+        finalCategories.forEach(c => { row.push(dayData[c] || 0); row.push(tooltip); });
+        arr.push(row);
+      });
+      return arr;
+    };
+    return { ownerNames: ["🐷", "🐱"], dataA: buildArray("Billy"), dataB: buildArray("Karen") };
   } catch (e) { return { error: e.toString() }; }
 }
 
