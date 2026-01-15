@@ -17,13 +17,9 @@ function onOpen() {
     .addItem('View Incident Trend', 'showIncidentTrendModal')
     .addItem('View Task Time Trend', 'showTimeTrendModal')
     .addSeparator()
-    .addItem('Run Full Status Sync', 'manualSync')
     .addItem('Sync Task Database', 'runUnifiedSync')
     .addSeparator()
     .addItem('Manual Backup', 'createHourlySnapshot')
-    .addSeparator()
-    .addItem('Roll Dates Manually', 'maintenance_RollDates')
-    .addItem('Debug Headers', 'debugHeaders')
     .addToUi();
 }
 
@@ -121,40 +117,6 @@ function findDateColInHistory(targetDate) {
 }
 
 /**
- * RECURRENCE SYNC
- */
-function manualSync() {
-  const sheet = SS.getSheetByName("Prioritization");
-  if (!sheet) { SS.toast("Error: Prioritization sheet not found."); return; }
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
-  const idx = { refDue: headers.indexOf("ReferenceDueDate") + 1, due: headers.indexOf("DueDate") + 1, recur: headers.indexOf("Recurrence") + 1 };
-  if (idx.refDue === 0 || idx.due === 0 || idx.recur === 0) { SS.toast("Error: Mapping failed."); return; }
-  for (let i = 2; i <= data.length; i++) {
-    updateSingleRowStatus(sheet, i, data[i-1], idx);
-  }
-  SS.toast("Sync Complete.");
-}
-
-function updateSingleRowStatus(sheet, rowNum, rowData, idx) {
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  let refDue = rowData[idx.refDue - 1];
-  if (!(refDue instanceof Date)) return;
-  const recurVal = String(rowData[idx.recur - 1] || "").toLowerCase();
-  const num = parseFloat(recurVal.replace(/[^\d.]/g, '')) || 0;
-  let nextDue = new Date(refDue);
-  if (num > 0) {
-    while (nextDue < today) {
-      if (recurVal.includes("day")) nextDue.setDate(nextDue.getDate() + num);
-      else if (recurVal.includes("week")) nextDue.setDate(nextDue.getDate() + (num * 7));
-      else if (recurVal.includes("month")) nextDue.setMonth(nextDue.getMonth() + num);
-      else break;
-    }
-    sheet.getRange(rowNum, idx.due).setValue(nextDue);
-  }
-}
-
-/**
  * MAINTENANCE
  */
 function createHourlySnapshot() {
@@ -164,10 +126,4 @@ function createHourlySnapshot() {
     DriveApp.getFileById(SS.getId()).makeCopy(fileName, folder);
     SS.toast("Backup Created ✅");
   } catch (e) { SS.toast("Backup Failed"); }
-}
-
-function debugHeaders() {
-  const sheet = SS.getSheetByName("Prioritization");
-  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  SpreadsheetApp.getUi().alert("Headers: " + JSON.stringify(headers));
 }
