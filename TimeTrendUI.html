@@ -55,7 +55,8 @@
       if (!allRes) return;
       const data = google.visualization.arrayToDataTable(currentOwner === 'A' ? allRes.dataA : allRes.dataB);
       const textColor = isDarkMode ? '#cbd5e1' : '#334155';
-      const gridColor = isDarkMode ? '#334155' : '#e2e8f0';
+      const majorColor = isDarkMode ? '#94a3b8' : '#64748b'; // Thick/Dark for labeled
+      const minorColor = isDarkMode ? '#1e293b' : '#e2e8f0'; // Thin/Light for unlabeled
 
       const options = {
         isStacked: true, 
@@ -63,7 +64,12 @@
         chartArea: { width: '85%', height: '60%', bottom: 120 },
         legend: { position: 'bottom', maxLines: 3, textStyle: { color: textColor, fontSize: 11 } },
         hAxis: { textStyle: { color: textColor, fontSize: 10 }, slantedText: true, slantedTextAngle: 45 },
-        vAxis: { title: 'Minutes', textStyle: { color: textColor }, gridlines: { color: gridColor } },
+        vAxis: { 
+            title: 'Minutes', 
+            textStyle: { color: textColor }, 
+            gridlines: { color: majorColor },
+            minorGridlines: { color: minorColor, count: 1 } 
+        },
         tooltip: { isHtml: true, trigger: 'both' }
       };
       new google.visualization.ColumnChart(document.getElementById('chart_div')).draw(data, options);

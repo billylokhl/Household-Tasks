@@ -3,6 +3,7 @@
  * Version: 77.0 (Force Tooltip Contrast)
  */
 
+/*
 function onOpen() {
   const ui = SpreadsheetApp.getUi();
   ui.createMenu('Task Tools')
@@ -14,6 +15,7 @@ function onOpen() {
       .addItem('Manual Archive Backup', 'manualBackup')
       .addToUi();
 }
+*/
 
 /** MODAL TRIGGERS **/
 function runUnifiedSync() {
