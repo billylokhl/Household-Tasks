@@ -4,7 +4,7 @@
  */
 
 const SS = SpreadsheetApp.getActiveSpreadsheet();
-const BACKUP_FOLDER_ID = "1S_HRJlzJ9JPMcD2aamy036FIGb8xxd96"; 
+const BACKUP_FOLDER_ID = "1S_HRJlzJ9JPMcD2aamy036FIGb8xxd96";
 
 /**
  * RESTORES MENU: Run this manually if the menu disappears.
@@ -12,15 +12,14 @@ const BACKUP_FOLDER_ID = "1S_HRJlzJ9JPMcD2aamy036FIGb8xxd96";
 function onOpen() {
   const ui = SpreadsheetApp.getUi();
   ui.createMenu('🚀 Task Tools')
-    .addItem('Planner', 'openPlanner') 
+    .addItem('Planner', 'openPlanner')
     .addSeparator()
-    .addItem('View Incident Trend', 'showIncidentTrendModal') 
-    .addItem('View Task Time Trend', 'showTimeTrendModal') 
+    .addItem('View Incident Trend', 'showIncidentTrendModal')
+    .addItem('View Task Time Trend', 'showTimeTrendModal')
     .addSeparator()
     .addItem('Run Full Status Sync', 'manualSync')
-    .addItem('Log DONE Tasks to History', 'runHistorySync')
+    .addItem('Sync Task Database', 'runUnifiedSync')
     .addSeparator()
-    .addItem('Sync Task History', 'startInitialization')
     .addItem('Manual Backup', 'createHourlySnapshot')
     .addSeparator()
     .addItem('Roll Dates Manually', 'maintenance_RollDates')
@@ -55,11 +54,11 @@ function getIncidentTrendData() {
   if (!sheet) return { error: "TaskHistory sheet not found" };
   const range = sheet.getDataRange();
   const data = range.getValues();
-  const backgrounds = range.getBackgrounds(); 
-  const notes = range.getNotes(); 
+  const backgrounds = range.getBackgrounds();
+  const notes = range.getNotes();
   const headers = data[0];
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  const targetRed = "#ea9999"; 
+  const targetRed = "#ea9999";
   let res = { pig: [["Date", "Incidents"]], cat: [["Date", "Incidents"]], details: { pig: [], cat: [] } };
   let dailyRaw = [];
 
@@ -98,7 +97,7 @@ function getIncidentTrendData() {
 function findTaskRowInHistory(category, taskName) {
   const sheet = SS.getSheetByName("TaskHistory");
   if (!sheet) return null;
-  const data = sheet.getRange(1, 2, sheet.getLastRow(), 1).getValues(); 
+  const data = sheet.getRange(1, 2, sheet.getLastRow(), 1).getValues();
   const cleanTask = String(taskName || "").trim().toLowerCase();
   for (let i = 1; i < data.length; i++) {
     if (String(data[i][0]).trim().toLowerCase() === cleanTask) return i + 1;
@@ -118,7 +117,7 @@ function findDateColInHistory(targetDate) {
       if (Utilities.formatDate(headers[i], tz, "yyyy-MM-dd") === targetStr) return i + 1;
     }
   }
-  return 3; 
+  return 3;
 }
 
 /**

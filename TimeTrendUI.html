@@ -59,16 +59,16 @@
       const minorColor = isDarkMode ? '#1e293b' : '#e2e8f0'; // Thin/Light for unlabeled
 
       const options = {
-        isStacked: true, 
+        isStacked: true,
         backgroundColor: 'transparent',
         chartArea: { width: '85%', height: '60%', bottom: 120 },
         legend: { position: 'bottom', maxLines: 3, textStyle: { color: textColor, fontSize: 11 } },
         hAxis: { textStyle: { color: textColor, fontSize: 10 }, slantedText: true, slantedTextAngle: 45 },
-        vAxis: { 
-            title: 'Minutes', 
-            textStyle: { color: textColor }, 
+        vAxis: {
+            title: 'Minutes',
+            textStyle: { color: textColor },
             gridlines: { color: majorColor },
-            minorGridlines: { color: minorColor, count: 1 } 
+            minorGridlines: { color: minorColor, count: 1 }
         },
         tooltip: { isHtml: true, trigger: 'both' }
       };
