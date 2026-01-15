@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+  <style>
+    :root { --bg: #ffffff; --text: #333333; --border: #e2e8f0; }
+    body.dark-mode { --bg: #0f172a; --text: #f1f5f9; --border: #334155; }
+    body { font-family: 'Segoe UI', sans-serif; background-color: var(--bg); color: var(--text); padding: 20px; height: 100vh; display: flex; flex-direction: column; overflow: hidden; margin: 0; box-sizing: border-box; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-shrink: 0; }
+    .btn-group { display: flex; gap: 10px; }
+    .btn { padding: 12px 24px; cursor: pointer; border: 1px solid var(--border); border-radius: 8px; background: #f8fafc; font-size: 18px; }
+    .btn.active { background: #3b82f6; color: white; border-color: #2563eb; }
+    #chart_div { flex-grow: 1; min-height: 400px; width: 100%; }
+    /* Fix for Google's own tooltip container */
+    .google-visualization-tooltip { border: none !important; background: transparent !important; box-shadow: none !important; }
+  </style>
+</head>
+<body id="body">
+  <div class="header">
+    <div class="btn-group">
+      <button id="btnA" class="btn active" onclick="switchOwner('A')">🐷</button>
+      <button id="btnB" class="btn" onclick="switchOwner('B')">🐱</button>
+    </div>
+    <button class="btn" style="font-size:14px" onclick="toggleTheme()">🌓 Theme</button>
+  </div>
+  <div id="chart_div"></div>
+  <script>
+    google.charts.load('current', {'packages':['corechart']});
+    let allRes = null, currentOwner = 'A', isDarkMode = false;
+
+    function init() {
+      google.script.run.withSuccessHandler(res => {
+        if (res.error) { document.getElementById('chart_div').innerHTML = "Error: " + res.error; return; }
+        allRes = res;
+        drawChart();
+      }).getTimeSpentData(isDarkMode);
+    }
+
+    function switchOwner(o) {
+      currentOwner = o;
+      document.getElementById('btnA').classList.toggle('active', o === 'A');
+      document.getElementById('btnB').classList.toggle('active', o === 'B');
+      drawChart();
+    }
+
+    function toggleTheme() {
+      isDarkMode = !isDarkMode;
+      document.getElementById('body').classList.toggle('dark-mode', isDarkMode);
+      // Re-fetch data to update HTML tooltip colors
+      init();
+    }
+
+    function drawChart() {
+      if (!allRes) return;
+      const data = google.visualization.arrayToDataTable(currentOwner === 'A' ? allRes.dataA : allRes.dataB);
+      const textColor = isDarkMode ? '#cbd5e1' : '#334155';
+      const gridColor = isDarkMode ? '#334155' : '#e2e8f0';
+
+      const options = {
+        isStacked: true, 
+        backgroundColor: 'transparent',
+        chartArea: { width: '85%', height: '60%', bottom: 120 },
+        legend: { position: 'bottom', maxLines: 3, textStyle: { color: textColor, fontSize: 11 } },
+        hAxis: { textStyle: { color: textColor, fontSize: 10 }, slantedText: true, slantedTextAngle: 45 },
+        vAxis: { title: 'Minutes', textStyle: { color: textColor }, gridlines: { color: gridColor } },
+        tooltip: { isHtml: true, trigger: 'both' }
+      };
+      new google.visualization.ColumnChart(document.getElementById('chart_div')).draw(data, options);
+    }
+
+    google.charts.setOnLoadCallback(init);
+    window.addEventListener('resize', drawChart);
+  </script>
+</body>
+</html>

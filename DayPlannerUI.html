@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, sans-serif; padding: 15px; background: #fff; color: #333; }
+    .top-bar { display: grid; grid-template-columns: 1fr auto; gap: 20px; background: #f1f3f4; padding: 15px; border-radius: 8px; margin-bottom: 20px; align-items: flex-end; border: 1px solid #ddd; }
+    .filters-left { display: flex; gap: 10px; flex-wrap: wrap; }
+    .filter-group { display: flex; flex-direction: column; gap: 5px; }
+    label { font-size: 11px; font-weight: bold; color: #5f6368; }
+    #status-container { height: 30px; margin-bottom: 10px; display: flex; align-items: center; padding: 0 10px; border-radius: 4px; font-size: 12px; font-weight: bold; opacity: 0; transition: opacity 0.3s ease; }
+    .status-active { opacity: 1 !important; background: #e8f0fe; color: #1967d2; border: 1px solid #d2e3fc; }
+    .status-done { opacity: 1 !important; background: #e6ffed; color: #1e8e3e; border: 1px solid #c6f0d1; }
+    .total-display-box { background: #1a73e8; color: white; padding: 10px 20px; border-radius: 6px; text-align: center; min-width: 200px; }
+    .total-display-box div:last-child { font-size: 22px; font-weight: 800; }
+
+    table { width: 100%; border-collapse: collapse; }
+    th { background: #f8f9fa; padding: 10px; font-size: 11px; border-bottom: 2px solid #dee2e6; cursor: pointer; text-align: center; }
+    td { padding: 8px 10px; border-bottom: 1px solid #eee; font-size: 12.5px; text-align: center; }
+    
+    .col-ect { min-width: 85px; white-space: nowrap !important; }
+    .text-left { text-align: left !important; }
+    .done-row { color: #bbbbbb !important; background-color: #fafafa; }
+    .done-row td { color: #bbbbbb !important; }
+
+    .filter-input { width: 100%; padding: 4px; margin-top: 5px; font-size: 11px; box-sizing: border-box; text-align: center; border: 1px solid #ccc; border-radius: 3px; }
+    .btn { padding: 8px 12px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px; }
+    .refresh-btn { background: #5f6368; color: white; }
+    .reset-btn { background: #fff; border: 1px solid #ccc; color: #3c4043; }
+    tr.selected-row { background-color: #e6ffed !important; }
+  </style>
+</head>
+<body>
+
+  <div class="top-bar">
+    <div class="filters-left">
+      <div class="filter-group">
+        <label>Days Out</label>
+        <input type="number" id="daysToPlan" value="1" style="width: 45px; text-align: center;">
+      </div>
+      <div class="filter-group">
+        <label>Show Overdue</label>
+        <select id="includeOverdue">
+          <option value="Yes">Yes</option>
+          <option value="No">No</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Show Completed</label>
+        <select id="showCompleted">
+          <option value="No">No</option>
+          <option value="Yes">Yes</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Owner</label>
+        <select id="owner">
+          <option value="🐷">🐷</option>
+          <option value="🐱">🐱</option>
+        </select>
+      </div>
+      <button class="btn refresh-btn" onclick="fetchTasks()">Refresh List</button>
+      <button class="btn reset-btn" onclick="resetFilters()">Clear Filters</button>
+    </div>
+    
+    <div class="total-display-box">
+      <div>Total Committed</div>
+      <div><span id="totalDisplay">0</span> mins</div>
+    </div>
+  </div>
+
+  <div id="status-container"></div>
+
+  <table id="plannerTable">
+    <thead>
+      <tr>
+        <th onclick="sortTable(0)">Due ⇅<br><input type="text" class="filter-input" placeholder="M/D" onkeyup="filterTable()"></th>
+        <th onclick="sortTable(1)">Day ⇅<br><input type="text" class="filter-input" onkeyup="filterTable()"></th>
+        <th onclick="sortTable(2)">Task ⇅<br><input type="text" class="filter-input" onkeyup="filterTable()" style="text-align: left;"></th>
+        <th onclick="sortTable(3)" class="col-ect">ECT ⇅<br><input type="text" class="filter-input" onkeyup="filterTable()"></th>
+        <th onclick="sortTable(4)">Imp ⇅<br><input type="text" class="filter-input" onkeyup="filterTable()"></th>
+        <th onclick="sortTable(5)">Score ⇅<br><input type="text" class="filter-input" onkeyup="filterTable()"></th>
+        <th onclick="sortTable(6)">Cat ⇅<br><input type="text" class="filter-input" onkeyup="filterTable()"></th>
+        <th onclick="sortTable(7)">Commit ⇅<br>
+          <select class="filter-input" id="commitFilter" onchange="filterTable()">
+            <option value="all">All</option>
+            <option value="checked">Checked</option>
+            <option value="unchecked">Unchecked</option>
+          </select>
+        </th>
+      </tr>
+    </thead>
+    <tbody id="taskBody"></tbody>
+  </table>
+
+  <script>
+    function setStatus(msg, type) {
+      const b = document.getElementById('status-container');
+      b.innerText = msg;
+      b.className = type === 'syncing' ? 'status-active' : (type === 'done' ? 'status-done' : '');
+    }
+
+    function fetchTasks() {
+      const config = {
+        daysToPlan: document.getElementById('daysToPlan').value,
+        includeOverdue: document.getElementById('includeOverdue').value,
+        showCompleted: document.getElementById('showCompleted').value,
+        owner: document.getElementById('owner').value
+      };
+      setStatus('🔄 Syncing...', 'syncing');
+      google.script.run
+        .withSuccessHandler(data => {
+          renderTable(data);
+          setStatus('✅ Data Updated', 'done');
+          setTimeout(() => setStatus('', ''), 2000);
+        })
+        .getPlannedTasks(config);
+    }
+
+    function renderTable(data) {
+      const tbody = document.getElementById('taskBody');
+      tbody.innerHTML = '';
+      data.forEach(t => {
+        const row = document.createElement('tr');
+        if (t.isDone) row.classList.add('done-row');
+        
+        // This is the specific fix: ensuring the score data maps to the 6th column (index 5)
+        row.innerHTML = `
+          <td data-sort="${t.dueSort}">${t.dueDate}</td>
+          <td>${t.day}</td>
+          <td class="text-left">${t.task}</td>
+          <td class="col-ect">${t.ectRaw}</td>
+          <td>${t.imp}</td>
+          <td>${t.score}</td>
+          <td>${t.cat}</td>
+          <td><input type="checkbox" onchange="calc(this,${t.ectMins})"></td>
+        `;
+        tbody.appendChild(row);
+      });
+      document.getElementById('totalDisplay').innerText = '0';
+    }
+
+    // Calculation and Filtering logic remains the same
+    function calc(cb, m) {
+      let total = parseInt(document.getElementById('totalDisplay').innerText);
+      if (cb.checked) {
+        total += m;
+        cb.closest('tr').classList.add('selected-row');
+      } else {
+        total -= m;
+        cb.closest('tr').classList.remove('selected-row');
+      }
+      document.getElementById('totalDisplay').innerText = total;
+    }
+
+    function resetFilters() {
+      document.querySelectorAll('.filter-input').forEach(i => i.value = '');
+      document.getElementById('commitFilter').value = 'all';
+      filterTable();
+    }
+
+    function filterTable() {
+      const inputs = document.querySelectorAll('.filter-input');
+      const commitF = document.getElementById('commitFilter').value;
+      const rows = document.getElementById('taskBody').rows;
+      for (let i = 0; i < rows.length; i++) {
+        let show = true;
+        for (let j = 0; j < 7; j++) {
+          let val = rows[i].cells[j].innerText.toUpperCase();
+          let f = inputs[j].value.toUpperCase();
+          if (f && val.indexOf(f) === -1) { show = false; break; }
+        }
+        if (show && commitF !== 'all') {
+          const chk = rows[i].cells[7].querySelector('input').checked;
+          if ((commitF === 'checked' && !chk) || (commitF === 'unchecked' && chk)) show = false;
+        }
+        rows[i].style.display = show ? "" : "none";
+      }
+    }
+
+    function sortTable(n) {
+      const table = document.getElementById("plannerTable");
+      let switching = true, dir = "asc", count = 0;
+      while (switching) {
+        switching = false;
+        let rows = table.rows;
+        for (var i = 1; i < (rows.length - 1); i++) {
+          var should = false;
+          var x = rows[i].cells[n], y = rows[i + 1].cells[n];
+          
+          // Use data-sort for Due Date (Column 0)
+          let vX = n === 0 ? parseFloat(x.dataset.sort) : (isNaN(x.innerText) ? x.innerText.toLowerCase() : parseFloat(x.innerText));
+          let vY = n === 0 ? parseFloat(y.dataset.sort) : (isNaN(y.innerText) ? y.innerText.toLowerCase() : parseFloat(y.innerText));
+          
+          if (dir == "asc" ? vX > vY : vX < vY) { should = true; break; }
+        }
+        if (should) { 
+          rows[i].parentNode.insertBefore(rows[i + 1], rows[i]); 
+          switching = true; count++; 
+        } else if (count == 0 && dir == "asc") { 
+          dir = "desc"; switching = true; 
+        }
+      }
+    }
+    window.onload = fetchTasks;
+  </script>
+</body>
+</html>

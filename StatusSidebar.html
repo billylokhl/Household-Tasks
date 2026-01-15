@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body { font-family: 'Segoe UI', sans-serif; background: #1a1a1a; color: #eee; padding: 20px; text-align: center; }
+    #status { margin: 20px 0; padding: 15px; border: 1px solid #444; background: #000; color: #00ff41; border-radius: 4px; font-family: monospace; font-size: 12px; min-height: 50px; display: flex; align-items: center; justify-content: center; }
+    button { background: #4285f4; color: white; border: none; padding: 15px; cursor: pointer; border-radius: 4px; font-weight: bold; width: 100%; }
+    button:disabled { background: #444; color: #888; }
+    .loader { border: 3px solid #333; border-top: 3px solid #00ff41; border-radius: 50%; width: 16px; height: 16px; animation: spin 1s linear infinite; margin-right: 10px; display: none; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <h3>Task Database Sync</h3>
+  <div id="status">Ready to sync all tasks...</div>
+  <button id="btn" onclick="run()">SYNC TASK DATABASE</button>
+
+  <script>
+    function run() {
+      const btn = document.getElementById('btn');
+      const stat = document.getElementById('status');
+      btn.disabled = true;
+      stat.innerHTML = '<div class="loader" id="ld" style="display:inline-block"></div> Running...';
+
+      google.script.run.withSuccessHandler(msg => {
+        stat.innerHTML = msg;
+        btn.disabled = false;
+      }).executeFullServerSync();
+    }
+  </script>
+</body>
+</html>

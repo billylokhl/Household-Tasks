@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+  <style>
+    :root { --bg: #ffffff; --text: #333333; --border: #eeeeee; --status-bg: #f8fafc; }
+    body.dark-mode { --bg: #1e1e1e; --text: #e0e0e0; --border: #333333; --status-bg: #0f172a; }
+    body { font-family: 'Segoe UI', sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 20px; height: 100vh; display: flex; flex-direction: column; overflow: hidden; box-sizing: border-box; }
+    .header-controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; flex-shrink: 0; }
+    .status-bar { display: flex; justify-content: space-between; align-items: center; background-color: var(--status-bg); border: 1px solid var(--border); border-radius: 6px; padding: 10px 15px; margin-bottom: 10px; font-size: 14px; flex-shrink: 0; }
+    .btn { padding: 10px 25px; font-size: 20px; cursor: pointer; border: 1px solid var(--border); border-radius: 8px; background: #f1f5f9; }
+    .btn.active { background: #ef4444; color: white; border-color: #b91c1c; }
+    #chart_div { width: 100%; height: 380px; flex-shrink: 0; }
+    #summary_container { flex-grow: 1; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; margin-top: 10px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { position: sticky; top: 0; background: #f8fafc; padding: 12px; text-align: left; border-bottom: 2px solid var(--border); }
+    body.dark-mode th { background: #1e293b; color: #f1f5f9; }
+    td { padding: 12px; border-bottom: 1px solid var(--border); }
+  </style>
+</head>
+<body id="body">
+  <div class="header-controls">
+    <div>
+      <button id="btnPig" class="btn active" onclick="switchOwner('pig')">🐷</button>
+      <button id="btnCat" class="btn" onclick="switchOwner('cat')">🐱</button>
+    </div>
+    <button class="btn" style="font-size:14px" onclick="toggleTheme()">🌓 Theme</button>
+  </div>
+  <div class="status-bar">
+    <div id="statusInfo">Displaying Incidents (30-Day Window)</div>
+    <div id="statusStats" style="font-weight:bold;"></div>
+  </div>
+  <div id="chart_div"></div>
+  <div id="summary_container">
+    <table>
+      <thead><tr><th style="width:120px;">Incident Date</th><th style="width:150px;">Category</th><th>Task Name</th></tr></thead>
+      <tbody id="table_body"></tbody>
+    </table>
+  </div>
+  <script>
+    google.charts.load('current', {'packages':['corechart']});
+    let allData = null, currentOwner = 'pig', isDarkMode = false;
+    function init() {
+      google.script.run.withSuccessHandler(res => {
+        allData = res;
+        drawChart();
+        updateTable();
+      }).getIncidentTrendData();
+    }
+    function switchOwner(owner) {
+      currentOwner = owner;
+      document.getElementById('btnPig').classList.toggle('active', owner === 'pig');
+      document.getElementById('btnCat').classList.toggle('active', owner === 'cat');
+      drawChart();
+      updateTable();
+    }
+    function toggleTheme() {
+      isDarkMode = !isDarkMode;
+      document.getElementById('body').classList.toggle('dark-mode', isDarkMode);
+      drawChart();
+    }
+    function updateTable() {
+      const tbody = document.getElementById('table_body');
+      tbody.innerHTML = "";
+      if (!allData || !allData.details[currentOwner].length) {
+        tbody.innerHTML = "<tr><td colspan='3' style='text-align:center;padding:40px;'>No incidents found.</td></tr>";
+        return;
+      }
+      allData.details[currentOwner].forEach(item => {
+        let row = tbody.insertRow();
+        row.insertCell(0).innerText = item.date;
+        row.insertCell(1).innerText = item.cat;
+        row.insertCell(2).innerText = item.task;
+      });
+    }
+    function drawChart() {
+      if (!allData || !allData[currentOwner]) return;
+      const data = google.visualization.arrayToDataTable(allData[currentOwner]);
+      document.getElementById('statusStats').innerText = "Rolling 14-Day Sum: " + allData[currentOwner][allData[currentOwner].length-1][1];
+      const textColor = isDarkMode ? '#cbd5e1' : '#334155';
+      const gridColor = isDarkMode ? '#334155' : '#e2e8f0';
+      const options = {
+        backgroundColor: 'transparent',
+        chartArea: { width: '90%', height: '65%', bottom: 80, left: 40 },
+        hAxis: { textStyle: { color: textColor, fontSize: 11 }, slantedText: true, slantedTextAngle: 45 },
+        vAxis: { textStyle: { color: textColor }, format: '0', viewWindow: { min: 0 }, gridlines: { color: gridColor } },
+        legend: { position: 'none' },
+        colors: [currentOwner === 'pig' ? '#ef4444' : '#f59e0b']
+      };
+      new google.visualization.ColumnChart(document.getElementById('chart_div')).draw(data, options);
+    }
+    google.charts.setOnLoadCallback(init);
+    window.addEventListener('resize', drawChart);
+  </script>
+</body>
+</html>
