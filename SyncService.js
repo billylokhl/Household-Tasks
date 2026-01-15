@@ -21,34 +21,20 @@ function executeFullServerSync() {
     const sheet = ss.getSheetByName(CONFIG.SHEET.PRIORITIZATION);
     const archiveSheet = ss.getSheetByName(CONFIG.SHEET.ARCHIVE) || ss.insertSheet(CONFIG.SHEET.ARCHIVE);
 
-    const namedRanges = ss.getNamedRanges();
     const colMap = [];
 
-    // 1. Collect all Named Ranges on the Source Sheet
-    namedRanges.forEach(nr => {
-      try {
-        if (nr.getRange().getSheet().getName() === CONFIG.SHEET.PRIORITIZATION) {
-          const rawName = nr.getName();
-          let cleanName = rawName.split('!').pop().replace(/'/g, "");
-          colMap.push({ name: cleanName, col: nr.getRange().getColumn() });
-        }
-      } catch (e) {
-        // Ignore invalid ranges
+    // Scan table headers to identify columns
+    const headerRowValues = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+
+    headerRowValues.forEach((header, index) => {
+      const hName = String(header).trim();
+      if (hName !== "") {
+        colMap.push({ name: hName, col: index + 1 });
       }
     });
 
-    // 2. Explicitly scan headers to catch "CompletionDate" if it's missing from Named Ranges
-    const headerRowValues = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    const compDateIdx = headerRowValues.findIndex(h => String(h).toLowerCase().replace(/\s/g, '') === "completiondate");
-    if (compDateIdx !== -1) {
-       const existing = colMap.find(m => m.col === (compDateIdx + 1));
-       if (!existing) {
-          colMap.push({ name: "CompletionDate", col: compDateIdx + 1 });
-       }
-    }
-
     const taskMapping = colMap.find(m => m.name.toLowerCase() === "task");
-    if (!taskMapping) return "Error: Could not find 'Task' Named Range (or column).";
+    if (!taskMapping) return "Error: Could not find 'Task' column.";
 
     // Sort columns by position to ensure clean data read
     colMap.sort((a, b) => a.col - b.col);
@@ -57,13 +43,48 @@ function executeFullServerSync() {
     // The "Sync Date" is our internal primary key for the archive row
     const headers = ["Sync Date", ...sortedKeys];
 
+    // --- SCHEMA MIGRATION: Auto-heal Archive Structure ---
+    const archLastCol = archiveSheet.getLastColumn();
+    const archLastRow = archiveSheet.getLastRow();
+
+    if (archLastCol > 0) {
+      const currentArchHeaders = archiveSheet.getRange(1, 1, 1, archLastCol).getValues()[0].map(h => String(h).trim());
+      // Check if schema changed
+      if (JSON.stringify(currentArchHeaders) !== JSON.stringify(headers)) {
+         const oldHeaderMap = {};
+         currentArchHeaders.forEach((h, i) => oldHeaderMap[h] = i);
+
+         if (archLastRow > 1) {
+            // Retrieve old data and remap to new columns
+            const oldData = archiveSheet.getRange(2, 1, archLastRow - 1, archLastCol).getValues();
+            const migratedData = oldData.map(row => {
+              return headers.map(targetH => {
+                const oldIdx = oldHeaderMap[targetH];
+                return (oldIdx !== undefined && oldIdx < row.length) ? row[oldIdx] : "";
+              });
+            });
+
+            // Write migrated data
+            archiveSheet.clearContents();
+            archiveSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+            if (migratedData.length > 0) {
+              archiveSheet.getRange(2, 1, migratedData.length, headers.length).setValues(migratedData);
+            }
+         } else {
+            // Only headers
+            archiveSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+         }
+      }
+    } else {
+      // Initialize if empty
+      archiveSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    }
+    // --- END MIGRATION ---
+
     const lastRow = sheet.getLastRow();
     if (lastRow < 2) return "Prioritization sheet is empty.";
 
     const fullData = sheet.getRange(1, 1, lastRow, sheet.getLastColumn()).getValues();
-
-    // Set headers in archive (always update headers to match current config)
-    archiveSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
 
     const syncTimestamp = new Date();
     const rowsToAppend = [];
