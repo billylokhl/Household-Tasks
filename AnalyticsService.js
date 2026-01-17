@@ -88,7 +88,10 @@ function getTimeSpentData() {
     // 4. Build Rows for Google Charts
     const buildArray = (p) => {
       let header = ["Day"];
-      finalCategories.forEach(c => { header.push(c); header.push({ type: 'string', role: 'tooltip', p: {html: true} }); });
+      finalCategories.forEach(c => {
+        header.push({label: c, type: 'number'});
+        header.push({ type: 'string', role: 'tooltip', p: {html: true} });
+      });
       let arr = [header];
 
       timelineLabels.forEach(lb => {
@@ -103,7 +106,11 @@ function getTimeSpentData() {
         tooltip += `<tr class="chart-total"><td class="chart-pt"><b>TOTAL:</b></td><td class="chart-val chart-pt"><b>${dayData.total}m</b></td></tr></table></div>`;
 
         let row = [lb];
-        finalCategories.forEach(c => { row.push(dayData[c] || 0); row.push(tooltip); });
+        finalCategories.forEach(c => {
+          let v = dayData[c] || 0;
+          row.push(v === 0 ? null : v);
+          row.push(tooltip);
+        });
         arr.push(row);
       });
       return arr;

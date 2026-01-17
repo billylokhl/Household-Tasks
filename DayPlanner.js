@@ -77,8 +77,7 @@ function updatePlannerTask(rowId, field, value) {
   const headerMap = {
     'due': 'ReferenceDueDate',
     'ect': 'ECT',
-    'imp': 'Importance',
-    'cat': 'Category'
+    'imp': 'Importance'
   };
 
   const targetHeader = headerMap[field];
