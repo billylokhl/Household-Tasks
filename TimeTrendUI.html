@@ -32,6 +32,9 @@
     <button class="btn" style="font-size:14px" onclick="toggleTheme()">🌓 Theme</button>
   </div>
   <div id="chart_div"></div>
+  <div id="task_details_container" style="margin-top: 20px; border-top: 1px solid var(--border); padding-top: 10px; overflow-y: auto; height: 150px;">
+    <p style="color: var(--text); opacity: 0.7;">Hover over a bar to see task details.</p>
+  </div>
   <script>
     google.charts.load('current', {'packages':['corechart']});
     let allRes = null, currentOwner = 'A', isDarkMode = false;
@@ -60,7 +63,12 @@
 
     function drawChart() {
       if (!allRes) return;
-      const data = google.visualization.arrayToDataTable(currentOwner === 'A' ? allRes.dataA : allRes.dataB);
+
+      const dataSet = currentOwner === 'A' ? allRes.dataA : allRes.dataB;
+      const detailsSet = currentOwner === 'A' ? allRes.detailsA : allRes.detailsB;
+      const categories = currentOwner === 'A' ? allRes.catsA : allRes.catsB;
+
+      const data = google.visualization.arrayToDataTable(dataSet);
       const textColor = isDarkMode ? '#cbd5e1' : '#334155';
       const majorColor = isDarkMode ? '#94a3b8' : '#64748b'; // Thick/Dark for labeled
       const minorColor = isDarkMode ? '#1e293b' : '#e2e8f0'; // Thin/Light for unlabeled
@@ -79,7 +87,54 @@
         },
         tooltip: { isHtml: true, trigger: 'both' }
       };
-      new google.visualization.ColumnChart(document.getElementById('chart_div')).draw(data, options);
+
+      const chart = new google.visualization.ColumnChart(document.getElementById('chart_div'));
+
+      google.visualization.events.addListener(chart, 'onmouseover', function(e) {
+        if (e.row !== null && e.column !== null) {
+           // row index corresponds to array position minus header, but data.getValue(row, 0) handles it via DataTable abstract
+           const dateLabel = data.getValue(e.row, 0);
+
+           // Columns are: Day, Cat0, Tooltip, Cat1, Tooltip...
+           // So Cat Index = (Column Index - 1) / 2
+           // e.g. Col 1 -> (1-1)/2 = 0. Col 3 -> (3-1)/2 = 1.
+           const catIndex = Math.floor((e.column - 1) / 2);
+
+           if (catIndex >= 0 && catIndex < categories.length) {
+              const category = categories[catIndex];
+              showTaskDetails(dateLabel, category, detailsSet);
+           }
+        }
+      });
+
+      chart.draw(data, options);
+    }
+
+    function showTaskDetails(date, category, details) {
+        const container = document.getElementById('task_details_container');
+        // details structure: { "DateLabel": { "CategoryName": [ {task, mins}, ... ] } }
+        const dayData = details[date];
+        const tasks = (dayData && dayData[category]) ? dayData[category] : [];
+
+        let html = `<div style="font-weight: bold; margin-bottom: 8px;">${category} (${date})</div>`;
+        if (tasks.length === 0) {
+            html += '<div style="font-size: 13px;">No tasks recorded.</div>';
+        } else {
+            // Sort by mins desc
+            tasks.sort((a,b) => b.mins - a.mins);
+
+            html += `<table style="width:100%; border-collapse: collapse; font-size: 13px;">`;
+            html += `<thead style="color: var(--text); border-bottom: 1px solid var(--border);"><tr><th style="padding:4px; text-align:left;">Task</th><th style="padding:4px; text-align:right;">Mins</th></tr></thead>`;
+            html += `<tbody>`;
+            tasks.forEach(t => {
+               html += `<tr style="border-bottom: 1px solid var(--border);">
+                          <td style="padding: 4px;">${t.task}</td>
+                          <td style="padding: 4px; text-align: right;">${t.mins}</td>
+                        </tr>`;
+            });
+            html += `</tbody></table>`;
+        }
+        container.innerHTML = html;
     }
 
     google.charts.setOnLoadCallback(init);

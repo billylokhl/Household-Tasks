@@ -51,8 +51,11 @@ function getTimeSpentData() {
       let label = Utilities.formatDate(d, tz, "MM/dd (E)");
       timelineLabels.push(label);
       ["Billy", "Karen"].forEach(p => {
-        timelineData[p][label] = { total: 0, catBreakdown: {} };
-        finalCategories.forEach(c => timelineData[p][label][c] = 0);
+        timelineData[p][label] = { total: 0, catBreakdown: {}, taskDetails: {} };
+        finalCategories.forEach(c => {
+           timelineData[p][label][c] = 0;
+           timelineData[p][label].taskDetails[c] = [];
+        });
       });
     }
 
@@ -69,6 +72,7 @@ function getTimeSpentData() {
       const isKaren = (row[karenIdx] === true || String(row[karenIdx]).toUpperCase() === "TRUE");
       const mins = parseTimeValue(row[ectIdx]); // Use shared helper
       const rawCat = String(row[catIdx] || "Uncategorized").trim();
+      const taskName = String(data[i][getIdx("Task")] || "Unknown Task"); // Need Task Name
       let displayCat = topCats.includes(rawCat) ? rawCat : "Other";
 
       if (mins > 0) {
@@ -76,11 +80,17 @@ function getTimeSpentData() {
           timelineData.Billy[label][displayCat] += mins;
           timelineData.Billy[label].total += mins;
           timelineData.Billy[label].catBreakdown[rawCat] = (timelineData.Billy[label].catBreakdown[rawCat] || 0) + mins;
+
+          if (!timelineData.Billy[label].taskDetails[displayCat]) timelineData.Billy[label].taskDetails[displayCat] = [];
+          timelineData.Billy[label].taskDetails[displayCat].push({ task: taskName, mins: mins });
         }
         if (isKaren) {
           timelineData.Karen[label][displayCat] += mins;
           timelineData.Karen[label].total += mins;
           timelineData.Karen[label].catBreakdown[rawCat] = (timelineData.Karen[label].catBreakdown[rawCat] || 0) + mins;
+
+          if (!timelineData.Karen[label].taskDetails[displayCat]) timelineData.Karen[label].taskDetails[displayCat] = [];
+          timelineData.Karen[label].taskDetails[displayCat].push({ task: taskName, mins: mins });
         }
       }
     }
@@ -93,9 +103,12 @@ function getTimeSpentData() {
         header.push({ type: 'string', role: 'tooltip', p: {html: true} });
       });
       let arr = [header];
+      // New: Collect detail map
+      let details = {};
 
       timelineLabels.forEach(lb => {
         const dayData = timelineData[p][lb];
+        details[lb] = dayData.taskDetails;
 
         // Build HTML Tooltip
         let tooltip = `<div class="chart-tooltip">` +
@@ -113,10 +126,18 @@ function getTimeSpentData() {
         });
         arr.push(row);
       });
-      return arr;
+      return { array: arr, details: details, categories: finalCategories };
     };
 
-    return { ownerNames: ["🐷", "🐱"], dataA: buildArray("Billy"), dataB: buildArray("Karen") };
+    return {
+        ownerNames: ["🐷", "🐱"],
+        dataA: buildArray("Billy").array,
+        detailsA: buildArray("Billy").details,
+        catsA: buildArray("Billy").categories,
+        dataB: buildArray("Karen").array,
+        detailsB: buildArray("Karen").details,
+        catsB: buildArray("Karen").categories
+    };
   } catch (e) { return { error: e.toString() }; }
 }
 
