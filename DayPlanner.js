@@ -89,5 +89,14 @@ function updatePlannerTask(rowId, field, value) {
   if (colIndex < 1) return { error: "Column not found" };
 
   sheet.getRange(rowId, colIndex).setValue(value);
-  return { success: true };
+  SpreadsheetApp.flush(); // Ensure formulas update
+
+  // Fetch updated PriorityScore
+  const scoreIdx = headers.indexOf("PriorityScore");
+  let newScore = null;
+  if (scoreIdx > -1) {
+    newScore = sheet.getRange(rowId, scoreIdx + 1).getValue();
+  }
+
+  return { success: true, newScore: Math.round(newScore) };
 }
