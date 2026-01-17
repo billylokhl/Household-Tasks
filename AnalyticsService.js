@@ -17,14 +17,19 @@ function getTimeSpentData(isDarkMode) {
     const headers = data[0];
     const getIdx = (t) => headers.findIndex(h => String(h).toLowerCase() === t.toLowerCase());
 
-    const billyIdx = getIdx("OwnershipBilly");
-    const karenIdx = getIdx("OwnershipKaren");
+    let billyIdx = getIdx("OwnershipBilly");
+    if (billyIdx === -1) billyIdx = getIdx("Ownership🐷");
+
+    let karenIdx = getIdx("OwnershipKaren");
+    if (karenIdx === -1) karenIdx = getIdx("Ownership🐱");
 
     let ectIdx = getIdx("ECT");
     if (ectIdx === -1) ectIdx = getIdx("TimeSpent"); // Fallback
 
     const catIdx = getIdx("Category");
-    const compIdx = getIdx("CompletionDate");
+    let compIdx = getIdx("CompletionDate");
+    if (compIdx === -1) compIdx = getIdx("Sync Date");
+    if (compIdx === -1) compIdx = getIdx("SyncDate");
 
     // 1. Calculate Totals for Top Categories
     const catTotals = {};
