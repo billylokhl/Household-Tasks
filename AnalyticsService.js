@@ -7,7 +7,7 @@
  * TIME TREND ENGINE
  * Generates data for the Time Trend Chart.
  */
-function getTimeSpentData(isDarkMode) {
+function getTimeSpentData() {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const archive = ss.getSheetByName(CONFIG.SHEET.ARCHIVE);
@@ -91,20 +91,16 @@ function getTimeSpentData(isDarkMode) {
       finalCategories.forEach(c => { header.push(c); header.push({ type: 'string', role: 'tooltip', p: {html: true} }); });
       let arr = [header];
 
-      const ttBg = isDarkMode ? CONFIG.COLORS.DARK_MODE_BG : CONFIG.COLORS.LIGHT_MODE_BG;
-      const ttText = isDarkMode ? CONFIG.COLORS.DARK_MODE_TEXT : CONFIG.COLORS.LIGHT_MODE_TEXT;
-      const ttBorder = isDarkMode ? CONFIG.COLORS.DARK_MODE_BORDER : CONFIG.COLORS.LIGHT_MODE_BORDER;
-
       timelineLabels.forEach(lb => {
         const dayData = timelineData[p][lb];
 
         // Build HTML Tooltip
-        let tooltip = `<div style="padding:12px; background:${ttBg}; color:${ttText}; border:1px solid ${ttBorder}; font-family:sans-serif; min-width:200px; border-radius:4px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.5);">` +
-                      `<table style="width:100%; font-size:12px; border-collapse:collapse;">`;
+        let tooltip = `<div class="chart-tooltip">` +
+                      `<table>`;
         Object.entries(dayData.catBreakdown).sort((a,b) => b[1] - a[1]).forEach(([c, m]) => {
-            tooltip += `<tr><td style="padding:2px 0;">${c}:</td><td style="text-align:right; padding:2px 0 2px 10px;"><b>${m}m</b></td></tr>`;
+            tooltip += `<tr><td>${c}:</td><td class="chart-val"><b>${m}m</b></td></tr>`;
         });
-        tooltip += `<tr style="border-top:1px solid ${ttBorder};"><td style="padding-top:8px;"><b>TOTAL:</b></td><td style="text-align:right; padding-top:8px;"><b>${dayData.total}m</b></td></tr></table></div>`;
+        tooltip += `<tr class="chart-total"><td class="chart-pt"><b>TOTAL:</b></td><td class="chart-val chart-pt"><b>${dayData.total}m</b></td></tr></table></div>`;
 
         let row = [lb];
         finalCategories.forEach(c => { row.push(dayData[c] || 0); row.push(tooltip); });

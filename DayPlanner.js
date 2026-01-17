@@ -2,7 +2,7 @@
  * FILE: DayPlanner.gs
  */
 function getPlannedTasks(config) {
-  const sheet = SS.getSheetByName("Prioritization");
+  const sheet = getSS().getSheetByName("Prioritization");
   if (!sheet) return { error: "Prioritization sheet not found." };
 
   const data = sheet.getDataRange().getValues();
@@ -28,7 +28,7 @@ function getPlannedTasks(config) {
   const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
   return rows.filter(row => {
-    const userIsOwner = (config.owner === '🐷' && row[idx.ownP] === true) || 
+    const userIsOwner = (config.owner === '🐷' && row[idx.ownP] === true) ||
                         (config.owner === '🐱' && row[idx.ownC] === true);
     if (!userIsOwner) return false;
 

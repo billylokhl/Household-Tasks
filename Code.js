@@ -3,8 +3,11 @@
  * Version: 30.29 (Menu & Bridge Restore)
  */
 
-const SS = SpreadsheetApp.getActiveSpreadsheet();
 const BACKUP_FOLDER_ID = "1S_HRJlzJ9JPMcD2aamy036FIGb8xxd96";
+
+function getSS() {
+  return SpreadsheetApp.getActiveSpreadsheet();
+}
 
 /**
  * RESTORES MENU: Run this manually if the menu disappears.
@@ -45,7 +48,7 @@ function showTimeTrendModal() {
  * HELPERS: Row and Column Finders (Critical for MatrixEngine)
  */
 function findTaskRowInHistory(category, taskName) {
-  const sheet = SS.getSheetByName("TaskHistory");
+  const sheet = getSS().getSheetByName("TaskHistory");
   if (!sheet) return null;
   const data = sheet.getRange(1, 2, sheet.getLastRow(), 1).getValues();
   const cleanTask = String(taskName || "").trim().toLowerCase();
@@ -56,7 +59,7 @@ function findTaskRowInHistory(category, taskName) {
 }
 
 function findDateColInHistory(targetDate) {
-  const sheet = SS.getSheetByName("TaskHistory");
+  const sheet = getSS().getSheetByName("TaskHistory");
   if (!sheet) return null;
   const lastCol = Math.max(sheet.getLastColumn(), 3);
   const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
@@ -73,11 +76,4 @@ function findDateColInHistory(targetDate) {
 /**
  * MAINTENANCE
  */
-function createHourlySnapshot() {
-  try {
-    const folder = DriveApp.getFolderById(BACKUP_FOLDER_ID);
-    const fileName = SS.getName() + " [Backup] " + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm");
-    DriveApp.getFileById(SS.getId()).makeCopy(fileName, folder);
-    SS.toast("Backup Created ✅");
-  } catch (e) { SS.toast("Backup Failed"); }
-}
+// createHourlySnapshot moved to BackupSystem.gs

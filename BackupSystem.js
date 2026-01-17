@@ -4,15 +4,16 @@
  */
 function createHourlySnapshot() {
   try {
+    const ss = getSS();
     const folder = DriveApp.getFolderById(BACKUP_FOLDER_ID);
     const now = new Date();
     const timestamp = Utilities.formatDate(now, Session.getScriptTimeZone(), "yyyy-MM-dd_HHmm");
-    DriveApp.getFileById(SS.getId()).makeCopy(`Backup_${SS.getName()}_${timestamp}`, folder);
-    
+    DriveApp.getFileById(ss.getId()).makeCopy(`Backup_${ss.getName()}_${timestamp}`, folder);
+
     const oneWeekAgo = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
     const files = folder.getFiles();
     let deleted = 0;
-    
+
     while (files.hasNext()) {
       const file = files.next();
       if ((file.getName().indexOf("Backup_") === 0) && file.getDateCreated() < oneWeekAgo) {
@@ -20,6 +21,6 @@ function createHourlySnapshot() {
         deleted++;
       }
     }
-    SS.toast(`Backup saved. ${deleted > 0 ? deleted + " old backups purged." : ""}`, "📁 Backup System");
-  } catch (e) { SS.toast("Backup failed: " + e.toString(), "❌ Error"); }
+    ss.toast(`Backup saved. ${deleted > 0 ? deleted + " old backups purged." : ""}`, "📁 Backup System");
+  } catch (e) { getSS().toast("Backup failed: " + e.toString(), "❌ Error"); }
 }
