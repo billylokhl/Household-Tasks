@@ -27,6 +27,15 @@
     .refresh-btn { background: #5f6368; color: white; }
     .reset-btn { background: #fff; border: 1px solid #ccc; color: #3c4043; }
     tr.selected-row { background-color: #e6ffed !important; }
+
+    /* Force date input text centering in WebKit browsers */
+    input[type="date"] {
+      text-align: center;
+      display: inline-block;
+    }
+    input[type="date"]::-webkit-date-and-time-value {
+      text-align: center;
+    }
   </style>
 </head>
 <body>
@@ -125,7 +134,7 @@
 
         row.innerHTML = `
           <td data-sort="${t.dueSort}">
-             <input type="date" value="${t.isoDate || ''}" style="width:110px; border:none; background:transparent; font-size:12px; font-family:inherit;" onchange="updateTask(this, ${t.sheetRow}, 'due')">
+             <input type="date" value="${t.isoDate || ''}" style="width:110px; text-align:center; border:none; background:transparent; font-size:12px; font-family:inherit;" onchange="updateTask(this, ${t.sheetRow}, 'due')">
           </td>
           <td>${t.day}</td>
           <td class="text-left">${t.task}</td>

@@ -55,7 +55,7 @@ function getPlannedTasks(config) {
 
     return {
       sheetRow: item.originalRow,
-      score: row[idx.score] || 0,
+      score: Math.round(row[idx.score] || 0),
       imp: row[idx.imp] || "Normal",
       task: row[idx.task] || "Unnamed Task",
       ectRaw: row[idx.ect] || "0 mins",
