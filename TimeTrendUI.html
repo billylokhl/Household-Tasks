@@ -32,26 +32,34 @@
     <button class="btn" style="font-size:14px" onclick="toggleTheme()">🌓 Theme</button>
   </div>
   <div id="chart_div"></div>
-  <div id="task_details_container" style="margin-top: 20px; border-top: 1px solid var(--border); padding-top: 10px; overflow-y: auto; height: 150px;">
+  <div id="task_details_container" style="margin-top: 20px; border-top: 1px solid var(--border); padding-top: 10px; padding-right: 15px; overflow-y: auto; height: 150px;">
     <p style="color: var(--text); opacity: 0.7;">Hover over a bar to see task details.</p>
   </div>
+  <div id="debug_log" style="display:none; margin-top: 10px; padding: 10px; background: #eee; color: #333; font-family: monospace; font-size: 11px; height: 100px; overflow-y: scroll; border: 1px solid #ccc;"></div>
   <script>
     google.charts.load('current', {'packages':['corechart']});
     let allRes = null, currentOwner = 'A', isDarkMode = false;
 
     function init() {
+      const logDiv = document.getElementById('debug_log');
+      logDiv.style.display = 'block';
+      logDiv.innerHTML = '<div>Requesting data...</div>';
+
       google.script.run.withSuccessHandler(res => {
-        if (res.error) { document.getElementById('chart_div').innerHTML = "Error: " + res.error; return; }
+         // Render Logs
+         if (res.logs && res.logs.length > 0) {
+             const logHtml = res.logs.map(l => `<div>${l}</div>`).join('');
+             logDiv.innerHTML = `<strong>Execution Logs:</strong><br/>` + logHtml;
+         }
+
+        if (res.error) {
+            document.getElementById('chart_div').innerHTML = "Error: " + res.error;
+            logDiv.innerHTML += `<div style="color:red"><b>ERROR: ${res.error}</b></div>`;
+            return;
+        }
         allRes = res;
         drawChart();
       }).getTimeSpentData();
-    }
-
-    function switchOwner(o) {
-      currentOwner = o;
-      document.getElementById('btnA').classList.toggle('active', o === 'A');
-      document.getElementById('btnB').classList.toggle('active', o === 'B');
-      drawChart();
     }
 
     function toggleTheme() {
@@ -90,14 +98,13 @@
 
       const chart = new google.visualization.ColumnChart(document.getElementById('chart_div'));
 
-      google.visualization.events.addListener(chart, 'onmouseover', function(e) {
-        if (e.row !== null && e.column !== null) {
-           // row index corresponds to array position minus header, but data.getValue(row, 0) handles it via DataTable abstract
-           const dateLabel = data.getValue(e.row, 0);
+      google.visualization.events.addListener(chart, 'select', () => {
+        const selection = chart.getSelection();
+        if (selection.length > 0) {
+           const e = selection[0];
+           if (e.row == null || e.column == null) return;
 
-           // Columns are: Day, Cat0, Tooltip, Cat1, Tooltip...
-           // So Cat Index = (Column Index - 1) / 2
-           // e.g. Col 1 -> (1-1)/2 = 0. Col 3 -> (3-1)/2 = 1.
+           const dateLabel = data.getValue(e.row, 0);
            const catIndex = Math.floor((e.column - 1) / 2);
 
            if (catIndex >= 0 && catIndex < categories.length) {
@@ -122,13 +129,18 @@
         } else {
             // Sort by mins desc
             tasks.sort((a,b) => b.mins - a.mins);
-
-            html += `<table style="width:100%; border-collapse: collapse; font-size: 13px;">`;
-            html += `<thead style="color: var(--text); border-bottom: 1px solid var(--border);"><tr><th style="padding:4px; text-align:left;">Task</th><th style="padding:4px; text-align:right;">Mins</th></tr></thead>`;
+center; width: 60px;">Mins</th>
+                        </tr>
+                     </thead>`;
             html += `<tbody>`;
             tasks.forEach(t => {
                html += `<tr style="border-bottom: 1px solid var(--border);">
-                          <td style="padding: 4px;">${t.task}</td>
+                          <td style="padding: 4px; word-wrap: break-word;">${t.task}</td>
+                          <td style="padding: 4px; text-align: center
+            html += `<tbody>`;
+            tasks.forEach(t => {
+               html += `<tr style="border-bottom: 1px solid var(--border);">
+                          <td style="padding: 4px; word-wrap: break-word;">${t.task}</td>
                           <td style="padding: 4px; text-align: right;">${t.mins}</td>
                         </tr>`;
             });

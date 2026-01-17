@@ -8,30 +8,51 @@
  * Generates data for the Time Trend Chart.
  */
 function getTimeSpentData() {
+  const debugLog = [];
+  const log = (msg) => debugLog.push(`[${new Date().toLocaleTimeString()}] ${msg}`);
+
   try {
+    log("Starting getTimeSpentData...");
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const archive = ss.getSheetByName(CONFIG.SHEET.ARCHIVE);
     if (!archive) return { error: "Archive missing. Please run Sync first." };
 
+
+
     const data = archive.getDataRange().getValues();
     const headers = data[0];
-    const getIdx = (t) => headers.findIndex(h => String(h).toLowerCase() === t.toLowerCase());
+    // Helper: Normalize header search (case-insensitive, ignore spaces)
+    const normalize = (s) => String(s).toLowerCase().replace(/\s+/g, '');
+    const getIdx = (t) => headers.findIndex(hdr => normalize(hdr) === normalize(t));
+
+    log(`Archive Headers: ${headers.map(normalize).join(", ")}`);
 
     let billyIdx = getIdx("OwnershipBilly");
     if (billyIdx === -1) billyIdx = getIdx("Ownership🐷");
 
     let karenIdx = getIdx("OwnershipKaren");
+    if (karenIdx === -1) karenIdx = getIdx("OwnershipCat");
     if (karenIdx === -1) karenIdx = getIdx("Ownership🐱");
 
     let ectIdx = getIdx("ECT");
-    if (ectIdx === -1) ectIdx = getIdx("TimeSpent"); // Fallback
+    if (ectIdx === -1) ectIdx = getIdx("TimeSpent");
 
     const catIdx = getIdx("Category");
     let compIdx = getIdx("CompletionDate");
-    if (compIdx === -1) compIdx = getIdx("Sync Date");
     if (compIdx === -1) compIdx = getIdx("SyncDate");
 
-    // 1. Calculate Totals for Top Categories
+    const taskIdx = getIdx("Task");
+
+    log(`Indexes -> Billy:${billyIdx}, Karen:${karenIdx}, ECT:${ectIdx}, Cat:${catIdx}, Date:${compIdx}, Task:${taskIdx}`);
+
+    // Debugging: If key columns missing, return error
+    if (ectIdx === -1) return { error: "Missing 'ECT' or 'Time Spent' column.", logs: debugLog };
+    if (catIdx === -1) return { error: "Missing 'Category' column.", logs: debugLog };
+    if (compIdx === -1) return { error: "Missing Date column.", logs: debugLog };
+
+
+
+    // 1. Calculate Totals for Top Categories from Archive
     const catTotals = {};
     for (let i = 1; i < data.length; i++) {
       const c = String(data[i][catIdx] || "Uncategorized").trim();
@@ -72,7 +93,7 @@ function getTimeSpentData() {
       const isKaren = (row[karenIdx] === true || String(row[karenIdx]).toUpperCase() === "TRUE");
       const mins = parseTimeValue(row[ectIdx]); // Use shared helper
       const rawCat = String(row[catIdx] || "Uncategorized").trim();
-      const taskName = String(data[i][getIdx("Task")] || "Unknown Task"); // Need Task Name
+      const taskName = String(row[taskIdx] || "Unknown Task");
       let displayCat = topCats.includes(rawCat) ? rawCat : "Other";
 
       if (mins > 0) {
@@ -95,24 +116,23 @@ function getTimeSpentData() {
       }
     }
 
-    // 4. Build Rows for Google Charts
+    // 5. Build Rows with Styles and Annotations
     const buildArray = (p) => {
       let header = ["Day"];
       finalCategories.forEach(c => {
         header.push({label: c, type: 'number'});
         header.push({ type: 'string', role: 'tooltip', p: {html: true} });
       });
+
       let arr = [header];
-      // New: Collect detail map
       let details = {};
 
       timelineLabels.forEach(lb => {
         const dayData = timelineData[p][lb];
         details[lb] = dayData.taskDetails;
+        // const flags = dateFlags[lb];
 
-        // Build HTML Tooltip
-        let tooltip = `<div class="chart-tooltip">` +
-                      `<table>`;
+        let tooltip = `<div class="chart-tooltip"><table>`;
         Object.entries(dayData.catBreakdown).sort((a,b) => b[1] - a[1]).forEach(([c, m]) => {
             tooltip += `<tr><td>${c}:</td><td class="chart-val"><b>${m}m</b></td></tr>`;
         });
@@ -136,9 +156,10 @@ function getTimeSpentData() {
         catsA: buildArray("Billy").categories,
         dataB: buildArray("Karen").array,
         detailsB: buildArray("Karen").details,
-        catsB: buildArray("Karen").categories
+        catsB: buildArray("Karen").categories,
+        logs: debugLog
     };
-  } catch (e) { return { error: e.toString() }; }
+  } catch (e) { return { error: e.toString(), logs: debugLog }; }
 }
 
 /**

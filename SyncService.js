@@ -235,6 +235,15 @@ function performPrioritizationCleanup(sheet, fullData, colMap, completionMapping
         const recurrenceVal = recurrenceCol !== -1 ? fullData[r][recurrenceCol - 1] : "";
         const isRecurring = recurrenceVal && String(recurrenceVal).trim() !== "";
 
+        // CRITICAL UPDATE: Never delete tasks that have an IncidentDate
+        const incidentDateVal = incidentDateCol !== -1 ? fullData[r][incidentDateCol - 1] : "";
+        const hasIncident = incidentDateVal && String(incidentDateVal).trim() !== "";
+
+        if (hasIncident) {
+           // Do nothing - preserve task completely
+           continue;
+        }
+
         if (!isRecurring) {
            // Non-recurring: Delete row. No need to clear cells as the row is gone.
            rowsToDelete.push(rowIndex);
