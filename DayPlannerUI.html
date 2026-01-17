@@ -16,7 +16,7 @@
     table { width: 100%; border-collapse: collapse; }
     th { background: #f8f9fa; padding: 10px; font-size: 11px; border-bottom: 2px solid #dee2e6; cursor: pointer; text-align: center; }
     td { padding: 8px 10px; border-bottom: 1px solid #eee; font-size: 12.5px; text-align: center; }
-    
+
     .col-ect { min-width: 85px; white-space: nowrap !important; }
     .text-left { text-align: left !important; }
     .done-row { color: #bbbbbb !important; background-color: #fafafa; }
@@ -61,7 +61,7 @@
       <button class="btn refresh-btn" onclick="fetchTasks()">Refresh List</button>
       <button class="btn reset-btn" onclick="resetFilters()">Clear Filters</button>
     </div>
-    
+
     <div class="total-display-box">
       <div>Total Committed</div>
       <div><span id="totalDisplay">0</span> mins</div>
@@ -122,21 +122,45 @@
       data.forEach(t => {
         const row = document.createElement('tr');
         if (t.isDone) row.classList.add('done-row');
-        
-        // This is the specific fix: ensuring the score data maps to the 6th column (index 5)
+
         row.innerHTML = `
-          <td data-sort="${t.dueSort}">${t.dueDate}</td>
+          <td data-sort="${t.dueSort}">
+             <input type="date" value="${t.isoDate || ''}" style="width:110px; border:none; background:transparent; font-size:12px; font-family:inherit;" onchange="updateTask(this, ${t.sheetRow}, 'due')">
+          </td>
           <td>${t.day}</td>
           <td class="text-left">${t.task}</td>
-          <td class="col-ect">${t.ectRaw}</td>
-          <td>${t.imp}</td>
+          <td class="col-ect">
+             <input type="text" value="${t.ectRaw}" style="width:60px; text-align:center; border:none; background:transparent; font-size:12px; font-family:inherit;" onchange="updateTask(this, ${t.sheetRow}, 'ect')">
+          </td>
+          <td>
+             <input type="text" value="${t.imp}" style="width:70px; text-align:center; border:none; background:transparent; font-size:12px; font-family:inherit;" onchange="updateTask(this, ${t.sheetRow}, 'imp')">
+          </td>
           <td>${t.score}</td>
-          <td>${t.cat}</td>
+          <td>
+             <input type="text" value="${t.cat}" style="width:90px; text-align:center; border:none; background:transparent; font-size:12px; font-family:inherit;" onchange="updateTask(this, ${t.sheetRow}, 'cat')">
+          </td>
           <td><input type="checkbox" onchange="calc(this,${t.ectMins})"></td>
         `;
         tbody.appendChild(row);
       });
       document.getElementById('totalDisplay').innerText = '0';
+    }
+
+    function updateTask(el, rowId, field) {
+       el.style.backgroundColor = '#fff3cd'; // Yellow highlight while saving
+       setStatus('💾 Saving...', 'syncing');
+       google.script.run
+         .withSuccessHandler(() => {
+            el.style.backgroundColor = 'transparent';
+            setStatus('✅ Saved', 'done');
+            setTimeout(() => setStatus('', ''), 2000);
+         })
+         .withFailureHandler((err) => {
+            el.style.backgroundColor = '#f8d7da'; // Red highlight on error
+            setStatus('❌ Error', 'syncing');
+            console.error(err);
+         })
+         .updatePlannerTask(rowId, field, el.value);
     }
 
     // Calculation and Filtering logic remains the same
@@ -165,7 +189,9 @@
       for (let i = 0; i < rows.length; i++) {
         let show = true;
         for (let j = 0; j < 7; j++) {
-          let val = rows[i].cells[j].innerText.toUpperCase();
+          let cell = rows[i].cells[j];
+          let input = cell.querySelector('input');
+          let val = (input ? input.value : cell.innerText).toUpperCase();
           let f = inputs[j].value.toUpperCase();
           if (f && val.indexOf(f) === -1) { show = false; break; }
         }
@@ -186,18 +212,24 @@
         for (var i = 1; i < (rows.length - 1); i++) {
           var should = false;
           var x = rows[i].cells[n], y = rows[i + 1].cells[n];
-          
-          // Use data-sort for Due Date (Column 0)
-          let vX = n === 0 ? parseFloat(x.dataset.sort) : (isNaN(x.innerText) ? x.innerText.toLowerCase() : parseFloat(x.innerText));
-          let vY = n === 0 ? parseFloat(y.dataset.sort) : (isNaN(y.innerText) ? y.innerText.toLowerCase() : parseFloat(y.innerText));
-          
+
+          let getVal = (cell) => {
+             if (n === 0) return parseFloat(cell.dataset.sort);
+             let input = cell.querySelector('input');
+             let txt = input ? input.value : cell.innerText;
+             return isNaN(parseFloat(txt)) || txt === "" ? txt.toLowerCase() : parseFloat(txt);
+          };
+
+          let vX = getVal(x);
+          let vY = getVal(y);
+
           if (dir == "asc" ? vX > vY : vX < vY) { should = true; break; }
         }
-        if (should) { 
-          rows[i].parentNode.insertBefore(rows[i + 1], rows[i]); 
-          switching = true; count++; 
-        } else if (count == 0 && dir == "asc") { 
-          dir = "desc"; switching = true; 
+        if (should) {
+          rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
+          switching = true; count++;
+        } else if (count == 0 && dir == "asc") {
+          dir = "desc"; switching = true;
         }
       }
     }
