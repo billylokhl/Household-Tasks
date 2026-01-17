@@ -13,19 +13,27 @@
 </head>
 <body>
   <h3>Task Database Sync</h3>
-  <div id="status">Ready to sync all tasks...</div>
-  <button id="btn" onclick="run()">SYNC TASK DATABASE</button>
+  <div id="status">Starting sync...</div>
+  <button id="btn" onclick="run()" style="display:none;">RETRY</button>
 
   <script>
+    window.onload = function() {
+      run();
+    }
+
     function run() {
       const btn = document.getElementById('btn');
       const stat = document.getElementById('status');
+      btn.style.display = 'none';
       btn.disabled = true;
-      stat.innerHTML = '<div class="loader" id="ld" style="display:inline-block"></div> Running...';
+      stat.innerHTML = '<div class="loader" id="ld" style="display:inline-block"></div> Scannning Prioritization Sheet...';
 
       google.script.run.withSuccessHandler(msg => {
-        stat.innerHTML = msg;
+        // Convert newlines to HTML breaks for multi-line status
+        stat.innerHTML = msg.replace(/\n/g, '<br/>');
         btn.disabled = false;
+        btn.style.display = 'block'; // Show retry/close button
+        btn.innerText = "RUN AGAIN";
       }).executeFullServerSync();
     }
   </script>

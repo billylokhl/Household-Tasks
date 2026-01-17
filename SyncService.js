@@ -21,6 +21,14 @@ function executeFullServerSync() {
     const sheet = ss.getSheetByName(CONFIG.SHEET.PRIORITIZATION);
     const archiveSheet = ss.getSheetByName(CONFIG.SHEET.ARCHIVE) || ss.insertSheet(CONFIG.SHEET.ARCHIVE);
 
+    // Initial Status Check
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) return "Prioritization sheet is empty.";
+
+    // Approximate progress message (limited by GAS client-server model)
+    // GAS prevents streaming updates within a single function call easily.
+    // However, we can return more descriptive summary at the end.
+
     const colMap = [];
 
     // Scan table headers to identify columns
@@ -87,15 +95,16 @@ function executeFullServerSync() {
     }
     // --- END MIGRATION ---
 
-    const lastRow = sheet.getLastRow();
     if (lastRow < 2) return "Prioritization sheet is empty.";
 
     const fullData = sheet.getRange(1, 1, lastRow, sheet.getLastColumn()).getValues();
 
     const syncTimestamp = new Date();
     const rowsToAppend = [];
+    let scannedCount = 0;
 
     for (let r = 1; r < fullData.length; r++) {
+      scannedCount++;
       const taskVal = fullData[r][taskMapping.col - 1];
 
       const completionVal = completionMapping ? fullData[r][completionMapping.col - 1] : "";
@@ -114,15 +123,18 @@ function executeFullServerSync() {
       }
     }
 
+    let statusMsg = `Scanned ${scannedCount} rows. Found ${rowsToAppend.length} completed tasks. `;
+
     if (rowsToAppend.length > 0) {
       archiveSheet.getRange(archiveSheet.getLastRow() + 1, 1, rowsToAppend.length, rowsToAppend[0].length).setValues(rowsToAppend);
 
       // Perform cleanup on Prioritization sheet (delete non-recurring, clear fields on recurring)
       performPrioritizationCleanup(sheet, fullData, colMap, completionMapping, taskMapping);
-
-      return pruneArchiveDuplicatesSafe(archiveSheet);
     }
-    return "No rows found to sync.";
+
+    const archiveResult = pruneArchiveDuplicatesSafe(archiveSheet);
+    return statusMsg + "\n" + archiveResult;
+
   } catch (e) {
     return "Error: " + e.toString();
   }
@@ -138,9 +150,8 @@ function pruneArchiveDuplicatesSafe(sheet) {
   const headers = data[0];
   const findIdx = (term) => headers.findIndex(h => String(h).toLowerCase().endsWith(term.toLowerCase()));
   const taskIdx = findIdx("task");
-  const dueIdx = findIdx("duedate");
 
-  // Find Completion Date column for Archive cleanup
+  // Find Completion Date column for Archive cleanup AND deduplication
   const completionIdx = headers.findIndex(h => {
      const n = String(h).toLowerCase().replace(/\s/g, '');
      return n === "completiondate" || n === "completeddate";
@@ -149,20 +160,32 @@ function pruneArchiveDuplicatesSafe(sheet) {
   if (taskIdx === -1) return "Sync Complete (Warning: 'Task' column not found for deduplication).";
 
   const uniqueMap = new Map();
+  const tz = SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone();
+
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
-    // Create a unique key based on Task Name + Due Date (if available)
     const taskName = String(row[taskIdx]).trim().toLowerCase();
-    const dueDate = dueIdx !== -1 ? String(row[dueIdx]).trim().toLowerCase() : "";
-    const key = taskName + "|" + dueDate;
+
+    // Create a unique key based on Task + CompletionDate
+    let completionStr = "";
+    if (completionIdx !== -1) {
+        let v = row[completionIdx];
+        if (v instanceof Date) {
+            completionStr = Utilities.formatDate(v, tz, "yyyy-MM-dd");
+        } else {
+            completionStr = String(v).trim();
+        }
+    }
+
+    // Deduplication Key
+    const key = taskName + "|" + completionStr;
 
     const currentSyncTime = row[0] instanceof Date ? row[0].getTime() : new Date(row[0]).getTime(); // Handle SyncDate
 
-    // Check completion date for Archive cleanup
-    const hasCompletionDate = completionIdx !== -1 ? (row[completionIdx] && String(row[completionIdx]).trim() !== "") : true;
+    // Filter: Must have completion date
+    const hasCompletionDate = completionStr !== "";
 
     // Keep if new, or if this row has a newer Sync Date than what we have stored
-    // AND it has a completion date (if the column exists)
     if (hasCompletionDate && (!uniqueMap.has(key) || currentSyncTime > uniqueMap.get(key).time)) {
       uniqueMap.set(key, { time: currentSyncTime || 0, data: row });
     }
