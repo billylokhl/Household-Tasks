@@ -213,8 +213,6 @@ function performPrioritizationCleanup(sheet, fullData, colMap, completionMapping
   };
 
   const incidentDateCol = getColIndex("IncidentDate");
-  const incidentOwnerCol = getColIndex("IncidentOwner");
-  const incidentDetailsCol = getColIndex("IncidentDetails");
   const recurrenceCol = getColIndex("Recurrence");
   const completionCatCol = getColIndex("CompletionDate🐱");
   const completionPigCol = getColIndex("CompletionDate🐷");
@@ -244,21 +242,15 @@ function performPrioritizationCleanup(sheet, fullData, colMap, completionMapping
            continue;
         }
 
-        if (!isRecurring) {
-           // Non-recurring: Delete row. No need to clear cells as the row is gone.
-           rowsToDelete.push(rowIndex);
-        } else {
-           // Recurring: Keep row, but clear specific fields
-
-           // 1. Clear Incident Fields
-           [incidentDateCol, incidentOwnerCol, incidentDetailsCol].forEach(col => {
-              if (col !== -1) cellsToClear.push(sheet.getRange(rowIndex, col).getA1Notation());
-           });
-
-           // 2. Clear specific completion dates
+        if (isRecurring) {
+           // Recurring: Keep row, strictly clear specific fields as requested
+           // 1. Clear specific completion dates (🐱/🐷)
            [completionCatCol, completionPigCol].forEach(col => {
               if (col !== -1) cellsToClear.push(sheet.getRange(rowIndex, col).getA1Notation());
            });
+        } else {
+           // Non-recurring: Delete row.
+           rowsToDelete.push(rowIndex);
         }
      }
   }
