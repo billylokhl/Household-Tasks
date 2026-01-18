@@ -122,6 +122,26 @@
         .getTimeSpentData();
     }
 
+    function switchOwner(owner) {
+      if (currentOwner === owner) return;
+      currentOwner = owner;
+
+      // Update button visual state
+      const btnA = document.getElementById('btnA');
+      const btnB = document.getElementById('btnB');
+
+      if (owner === 'A') {
+         btnA.classList.add('active');
+         btnB.classList.remove('active');
+      } else {
+         btnA.classList.remove('active');
+         btnB.classList.add('active');
+      }
+
+      // Re-draw the chart with new owner's data
+      drawChart();
+    }
+
     function toggleTheme() {
       isDarkMode = !isDarkMode;
       document.getElementById('body').classList.toggle('dark-mode', isDarkMode);
