@@ -21,30 +21,56 @@ function getTimeSpentData() {
 
     const data = archive.getDataRange().getValues();
     const headers = data[0];
-    // Helper: Normalize header search (case-insensitive, ignore spaces)
+    // Helper: Normalize header search (case-insensitive, ignore spaces but KEEP emojis/special chars)
     const normalize = (s) => String(s).toLowerCase().replace(/\s+/g, '');
-    const getIdx = (t) => headers.findIndex(hdr => normalize(hdr) === normalize(t));
+    // Simple verification helper
+    const getIdx = (t) => {
+      const search = normalize(t);
+      return headers.findIndex(hdr => normalize(hdr).includes(search));
+    };
 
-    log(`Archive Headers: ${headers.map(normalize).join(", ")}`);
+    log(`Raw Archive Headers: ${headers.join(" | ")}`);
+    log(`Normalized Headers: ${headers.map(normalize).join(" | ")}`);
 
     let billyIdx = getIdx("OwnershipBilly");
     if (billyIdx === -1) billyIdx = getIdx("Ownership🐷");
+    if (billyIdx === -1) billyIdx = getIdx("Billy");
+    if (billyIdx === -1) billyIdx = getIdx("🐷");
 
     let karenIdx = getIdx("OwnershipKaren");
     if (karenIdx === -1) karenIdx = getIdx("OwnershipCat");
     if (karenIdx === -1) karenIdx = getIdx("Ownership🐱");
+    if (karenIdx === -1) karenIdx = getIdx("Karen");
+    if (karenIdx === -1) karenIdx = getIdx("Cat");
+    if (karenIdx === -1) karenIdx = getIdx("🐱");
 
     let ectIdx = getIdx("ECT");
     if (ectIdx === -1) ectIdx = getIdx("TimeSpent");
+    if (ectIdx === -1) ectIdx = getIdx("Minutes");
+    if (ectIdx === -1) ectIdx = getIdx("Duration");
 
     const catIdx = getIdx("Category");
+
     let compIdx = getIdx("CompletionDate");
+    if (compIdx === -1) compIdx = getIdx("Date");
     if (compIdx === -1) compIdx = getIdx("SyncDate");
 
     const taskIdx = getIdx("Task");
 
-    log(`Indexes -> Billy:${billyIdx}, Karen:${karenIdx}, ECT:${ectIdx}, Cat:${catIdx}, Date:${compIdx}, Task:${taskIdx}`);
+    log(`Calculated Indexes -> Billy:${billyIdx}, Karen:${karenIdx}, ECT:${ectIdx}, Cat:${catIdx}, Date:${compIdx}, Task:${taskIdx}`);
 
+    // Detail missing columns for the log
+    const missing = [];
+    if (billyIdx === -1) missing.push("Billy Owner");
+    if (karenIdx === -1) missing.push("Karen Owner");
+    if (ectIdx === -1) missing.push("Time/ECT");
+    if (catIdx === -1) missing.push("Category");
+    if (compIdx === -1) missing.push("Date");
+
+    if (missing.length > 0) {
+      log("ERROR: Missing columns: " + missing.join(", "));
+      return { error: "Missing columns: " + missing.join(", "), logs: debugLog };
+    }
     // Debugging: If key columns missing, return error
     if (ectIdx === -1) return { error: "Missing 'ECT' or 'Time Spent' column.", logs: debugLog };
     if (catIdx === -1) return { error: "Missing 'Category' column.", logs: debugLog };
@@ -80,17 +106,61 @@ function getTimeSpentData() {
       });
     }
 
+    log(`Timeline initialized. Range: ${timelineLabels[0]} to ${timelineLabels[timelineLabels.length-1]}`);
+
     // 3. Populate Data
+    let processedCount = 0;
+    let validDateCount = 0;
+    let inRangeCount = 0;
+
     for (let i = 1; i < data.length; i++) {
-      const row = data[i];
-      const compDate = safeParseDate(row[compIdx]);
-      if (!compDate) continue; // Skip if no valid completion date
+        const row = data[i];
+        let compDate = row[compIdx];
 
-      const label = Utilities.formatDate(compDate, tz, "MM/dd (E)");
-      if (!timelineData.Billy[label]) continue; // Skip if date matches outside 30-day window
+        // Debug first 5 rows regardless of validity
+        if (i <= 5) {
+             const bRaw = row[billyIdx];
+             const ectRaw = row[ectIdx];
+             log(`DEBUG ROW #${i}: RawDate="${compDate}", RawBilly="${bRaw}", RawECT="${ectRaw}"`);
+        }
 
-      const isBilly = (row[billyIdx] === true || String(row[billyIdx]).toUpperCase() === "TRUE");
-      const isKaren = (row[karenIdx] === true || String(row[karenIdx]).toUpperCase() === "TRUE");
+        // Robust date parsing using Spreadsheet TimeZone
+        if (typeof compDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(compDate)) {
+            compDate = Utilities.parseDate(compDate, tz, "yyyy-MM-dd");
+        } else {
+            compDate = safeParseDate(compDate);
+        }
+
+        if (!compDate) {
+             if (i <= 5) log(`-> Row #${i} Date Parse Failed`);
+             continue;
+        }
+        validDateCount++;
+
+        const label = Utilities.formatDate(compDate, tz, "MM/dd (E)");
+
+        if (i <= 5) log(`-> Row #${i} ParsedDate=${label}`);
+
+        if (!timelineData.Billy[label]) {
+             if (i <= 5) log(`-> Row #${i} Date ${label} not in timeline`);
+             continue;
+        }
+
+        inRangeCount++;
+
+        processedCount++;
+
+        // Looser ownership check to handle "TRUE", "Yes", "🐷", etc.
+        const bRaw = row[billyIdx];
+        const kRaw = row[karenIdx];
+
+        const isBilly = (bRaw === true || String(bRaw).toUpperCase().includes("TRUE") || String(bRaw).includes("🐷") || String(bRaw).toLowerCase() === "yes");
+        const isKaren = (kRaw === true || String(kRaw).toUpperCase().includes("TRUE") || String(kRaw).includes("🐱") || String(kRaw).toLowerCase() === "yes");
+
+        // Detailed logging for first 5 hits to debug
+        if (processedCount <= 5) {
+            log(`Row #${i}: Date=${label}, BillyVal="${bRaw}"(Is:${isBilly}), KarenVal="${kRaw}"(Is:${isKaren}), ECT=${row[ectIdx]}`);
+        }
       const mins = parseTimeValue(row[ectIdx]); // Use shared helper
       const rawCat = String(row[catIdx] || "Uncategorized").trim();
       const taskName = String(row[taskIdx] || "Unknown Task");
@@ -127,10 +197,13 @@ function getTimeSpentData() {
       let arr = [header];
       let details = {};
 
+      let hasData = false;
+
       timelineLabels.forEach(lb => {
         const dayData = timelineData[p][lb];
         details[lb] = dayData.taskDetails;
-        // const flags = dateFlags[lb];
+
+        if (dayData.total > 0) hasData = true;
 
         let tooltip = `<div class="chart-tooltip"><table>`;
         Object.entries(dayData.catBreakdown).sort((a,b) => b[1] - a[1]).forEach(([c, m]) => {
@@ -146,8 +219,13 @@ function getTimeSpentData() {
         });
         arr.push(row);
       });
+
+      if (!hasData) log(`WARNING: No data found for owner ${p} across all dates.`);
+
       return { array: arr, details: details, categories: finalCategories };
     };
+
+    log(`Stats: Total Rows=${data.length}, Valid Dates=${validDateCount}, Inside 30-Day Window=${inRangeCount}`);
 
     return {
         ownerNames: ["🐷", "🐱"],

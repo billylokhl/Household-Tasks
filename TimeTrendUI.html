@@ -29,37 +29,97 @@
       <button id="btnA" class="btn active" onclick="switchOwner('A')">🐷</button>
       <button id="btnB" class="btn" onclick="switchOwner('B')">🐱</button>
     </div>
-    <button class="btn" style="font-size:14px" onclick="toggleTheme()">🌓 Theme</button>
+    <div class="btn-group">
+      <button class="btn" style="font-size:14px" onclick="toggleDebugLog()">🔍 Debug Log</button>
+      <button class="btn" style="font-size:14px" onclick="toggleTheme()">🌓 Theme</button>
+    </div>
   </div>
   <div id="chart_div"></div>
   <div id="task_details_container" style="margin-top: 20px; border-top: 1px solid var(--border); padding-top: 10px; padding-right: 15px; overflow-y: auto; height: 150px;">
     <p style="color: var(--text); opacity: 0.7;">Hover over a bar to see task details.</p>
   </div>
-  <div id="debug_log" style="display:none; margin-top: 10px; padding: 10px; background: #eee; color: #333; font-family: monospace; font-size: 11px; height: 100px; overflow-y: scroll; border: 1px solid #ccc;"></div>
+  <div id="debug_log" style="display:none; margin-top: 10px; padding: 10px; background: #eee; color: #333; font-family: monospace; font-size: 11px; height: 150px; overflow-y: scroll; border: 1px solid #ccc;">
+    <div style="color: #999;">Step 1: Page loaded, waiting for scripts...</div>
+  </div>
   <script>
-    google.charts.load('current', {'packages':['corechart']});
+    // IMMEDIATE TEST - Does ANY JavaScript work?
+    try {
+      document.getElementById('debug_log').innerHTML = '<div style="color:green;">✅ JavaScript IS working! Initializing...</div>';
+    } catch(e) {
+      alert('JavaScript Error: ' + e.message);
+    }
+
+    // GRANULAR STATUS LOGGING
+    function updateStatus(msg, color = '#333') {
+      try {
+        const logDiv = document.getElementById('debug_log');
+        const timestamp = new Date().toLocaleTimeString();
+        logDiv.innerHTML += `<div style="color: ${color};">[${timestamp}] ${msg}</div>`;
+        logDiv.scrollTop = logDiv.scrollHeight;
+        console.log(msg);
+      } catch(e) {
+        console.error('updateStatus failed:', e);
+      }
+    }
+
+    updateStatus('Step 2: JavaScript executing...', 'blue');
+
+    // Try loading Google Charts with error handling
+    try {
+      if (typeof google === 'undefined') {
+        updateStatus('⚠️ WARNING: Google Charts library not loaded. Skipping chart, will show data only.', 'orange');
+      } else {
+        google.charts.load('current', {'packages':['corechart']});
+        updateStatus('Step 3: Google Charts load requested...', 'blue');
+      }
+    } catch(e) {
+      updateStatus('❌ ERROR loading Google Charts: ' + e.message, 'red');
+    }
+
     let allRes = null, currentOwner = 'A', isDarkMode = false;
 
     function init() {
-      const logDiv = document.getElementById('debug_log');
-      logDiv.style.display = 'block';
-      logDiv.innerHTML = '<div>Requesting data...</div>';
+      updateStatus('Step 4: init() function called!', 'green');
+      updateStatus('Step 5: Sending request to server (getTimeSpentData)...', 'blue');
 
-      google.script.run.withSuccessHandler(res => {
-         // Render Logs
-         if (res.logs && res.logs.length > 0) {
-             const logHtml = res.logs.map(l => `<div>${l}</div>`).join('');
-             logDiv.innerHTML = `<strong>Execution Logs:</strong><br/>` + logHtml;
-         }
+      google.script.run
+        .withSuccessHandler(res => {
+           updateStatus('Step 6: Server response received!', 'green');
+           console.log('Full response object:', res);
 
-        if (res.error) {
-            document.getElementById('chart_div').innerHTML = "Error: " + res.error;
-            logDiv.innerHTML += `<div style="color:red"><b>ERROR: ${res.error}</b></div>`;
-            return;
-        }
-        allRes = res;
-        drawChart();
-      }).getTimeSpentData();
+           // Render Logs FIRST
+           if (res.logs && res.logs.length > 0) {
+               updateStatus(`Step 7: Processing ${res.logs.length} log entries...`, 'blue');
+               const logHtml = res.logs.map(l => `<div>${l}</div>`).join('');
+               document.getElementById('debug_log').innerHTML = `<strong>📋 Execution Logs (${res.logs.length} entries):</strong><br/>` + logHtml;
+           } else {
+               updateStatus('⚠️ Step 7: No logs returned from server', 'orange');
+           }
+
+           if (res.error) {
+               updateStatus(`❌ ERROR from server: ${res.error}`, 'red');
+               document.getElementById('chart_div').innerHTML = "<strong style='color:red'>Error: " + res.error + "</strong>";
+               return;
+           }
+
+           updateStatus('Step 8: Data validated, preparing chart...', 'green');
+           allRes = res;
+           drawChart();
+           updateStatus('Step 9: Chart drawn successfully! ✅', 'green');
+        })
+        .withFailureHandler(err => {
+           updateStatus(`❌ FAILURE: Server call failed -
+
+      // Check if Google Charts is available
+      if (typeof google === 'undefined' || !google.visualization) {
+        updateStatus('⚠️ Google Charts not available, showing data as text', 'orange');
+        document.getElementById('chart_div').innerHTML = '<pre>' + JSON.stringify(allRes, null, 2) + '</pre>';
+        return;
+      }${err.message}`, 'red');
+           console.error('Full error:', err);
+           document.getElementById('chart_div').innerHTML = "<strong style='color:red'>Failed to load data. Check debug log.</strong>";
+        })
+        .getTimeSpentData();
     }
 
     function toggleTheme() {
@@ -69,8 +129,26 @@
       drawChart();
     }
 
+    function toggleDebugLog() {
+      const logDiv = document.getElementById('debug_log');
+      const taskDetailsContainer = document.getElementById('task_details_container');
+
+      if (logDiv.style.display === 'none') {
+        logDiv.style.display = 'block';
+        taskDetailsContainer.style.display = 'none';
+      } else {
+        logDiv.style.display = 'none';
+        taskDetailsContainer.style.display = 'block';
+      }
+    }
+
     function drawChart() {
-      if (!allRes) return;
+      if (!allRes) {
+        updateStatus('⚠️ drawChart() called but no data available', 'orange');
+        return;
+      }
+
+      updateStatus('Drawing chart with data...', 'blue');
 
       const dataSet = currentOwner === 'A' ? allRes.dataA : allRes.dataB;
       const detailsSet = currentOwner === 'A' ? allRes.detailsA : allRes.detailsB;
@@ -84,12 +162,13 @@
       const options = {
         isStacked: true,
         backgroundColor: 'transparent',
-        chartArea: { width: '85%', height: '60%', bottom: 120 },
+        chartArea: { width: '92%', height: '65%', left: 60, right: 20, bottom: 120 },
         legend: { position: 'bottom', maxLines: 3, textStyle: { color: textColor, fontSize: 11 } },
         hAxis: { textStyle: { color: textColor, fontSize: 10 }, slantedText: true, slantedTextAngle: 45 },
         vAxis: {
             title: 'Minutes',
             textStyle: { color: textColor },
+            titleTextStyle: { color: textColor },
             gridlines: { color: majorColor },
             minorGridlines: { color: minorColor, count: 1 }
         },
@@ -119,7 +198,6 @@
 
     function showTaskDetails(date, category, details) {
         const container = document.getElementById('task_details_container');
-        // details structure: { "DateLabel": { "CategoryName": [ {task, mins}, ... ] } }
         const dayData = details[date];
         const tasks = (dayData && dayData[category]) ? dayData[category] : [];
 
@@ -127,29 +205,35 @@
         if (tasks.length === 0) {
             html += '<div style="font-size: 13px;">No tasks recorded.</div>';
         } else {
-            // Sort by mins desc
             tasks.sort((a,b) => b.mins - a.mins);
-center; width: 60px;">Mins</th>
-                        </tr>
-                     </thead>`;
-            html += `<tbody>`;
+            html += `<table style="width:100%; font-size:12px;"><thead><tr style="border-bottom: 2px solid var(--border);"><th style="text-align: left; padding: 4px;">Task</th><th style="text-align: center; width: 60px;">Mins</th></tr></thead><tbody>`;
             tasks.forEach(t => {
-               html += `<tr style="border-bottom: 1px solid var(--border);">
-                          <td style="padding: 4px; word-wrap: break-word;">${t.task}</td>
-                          <td style="padding: 4px; text-align: center
-            html += `<tbody>`;
-            tasks.forEach(t => {
-               html += `<tr style="border-bottom: 1px solid var(--border);">
-                          <td style="padding: 4px; word-wrap: break-word;">${t.task}</td>
-                          <td style="padding: 4px; text-align: right;">${t.mins}</td>
-                        </tr>`;
+               html += `<tr style="border-bottom: 1px solid var(--border);"><td style="padding: 4px; word-wrap: break-word;">${t.task}</td><td style="padding: 4px; text-align: right;">${t.mins}</td></tr>`;
             });
             html += `</tbody></table>`;
         }
         container.innerHTML = html;
     }
 
-    google.charts.setOnLoadCallback(init);
+    // Initialize when Google Charts is ready, or fallback after timeout
+    if (typeof google !== 'undefined' && google.charts) {
+      google.charts.setOnLoadCallback(() => {
+        updateStatus('Step 3.5: Google Charts loaded successfully!', 'green');
+        init();
+      });
+
+      // Fallback if callback never fires
+      setTimeout(() => {
+        if (!allRes) {
+          updateStatus('⚠️ TIMEOUT: Google Charts callback did not fire. Trying init anyway...', 'orange');
+          init();
+        }
+      }, 5000);
+    } else {
+      updateStatus('⚠️ Google object not available. Starting without charts...', 'orange');
+      setTimeout(init, 500);
+    }
+
     window.addEventListener('resize', drawChart);
   </script>
 </body>
