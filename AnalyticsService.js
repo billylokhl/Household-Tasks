@@ -7,14 +7,16 @@
  * TIME TREND ENGINE
  * Generates data for the Time Trend Chart.
  * @param {number} maWindow - Moving average window in days (default 30)
+ * @param {boolean} weekendOnly - If true, MA only considers weekend days (default true)
  */
-function getTimeSpentData(maWindow) {
-  maWindow = maWindow || 30; // Default to 30 days if not provided
+function getTimeSpentData(maWindow, weekendOnly) {
+  maWindow = maWindow || 28; // Default to 28 days if not provided
+  weekendOnly = (weekendOnly === undefined || weekendOnly === null) ? true : weekendOnly;
   const debugLog = [];
   const log = (msg) => debugLog.push(`[${new Date().toLocaleTimeString()}] ${msg}`);
 
   try {
-    log(`Starting getTimeSpentData with MA window=${maWindow}...`);
+    log(`Starting getTimeSpentData with MA window=${maWindow}, Weekend Only=${weekendOnly}...`);
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const archive = ss.getSheetByName(CONFIG.SHEET.ARCHIVE);
     if (!archive) return { error: "Archive missing. Please run Sync first." };
@@ -94,9 +96,11 @@ function getTimeSpentData(maWindow) {
     const timelineLabels = [];
     const timelineData = { Billy: {}, Karen: {} };
 
-    // 2. Initialize Last 30 Days
+    // 2. Initialize Last 30 Days with weekend flag
+    const timelineDates = []; // Store actual Date objects for weekend checking
     for (let i = 29; i >= 0; i--) {
       let d = new Date(); d.setDate(d.getDate() - i);
+      timelineDates.push(d);
       let label = Utilities.formatDate(d, tz, "MM/dd (E)");
       timelineLabels.push(label);
       ["Billy", "Karen"].forEach(p => {
@@ -229,8 +233,16 @@ function getTimeSpentData(maWindow) {
         let maSum = 0;
         let maCount = 0;
         for (let j = 0; j < maWindow && idx - j >= 0; j++) {
-          maSum += dailyTotals[idx - j];
-          maCount++;
+          const lookbackIdx = idx - j;
+          const lookbackDate = timelineDates[lookbackIdx];
+          const dayOfWeek = lookbackDate.getDay(); // 0=Sunday, 6=Saturday
+
+          // Include day in MA if: not weekendOnly OR (weekendOnly AND is weekend)
+          const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
+          if (!weekendOnly || isWeekend) {
+            maSum += dailyTotals[lookbackIdx];
+            maCount++;
+          }
         }
         const maValue = maCount > 0 ? (maSum / maCount) : null;
         row.push(maValue);

@@ -30,9 +30,13 @@
       <button id="btnB" class="btn" onclick="switchOwner('B')">🐱</button>
     </div>
     <div class="btn-group" style="align-items: center;">
-      <label style="font-size: 14px; margin-right: 5px;">MA Window:</label>
-      <input type="number" id="maWindow" value="30" min="2" max="29" style="width: 60px; padding: 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--text);" onchange="refreshData()" />
+      <label style="font-size: 14px; margin-right: 5px;">Moving Daily Average Window:</label>
+      <input type="number" id="maWindow" value="28" min="2" max="29" style="width: 60px; padding: 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--text);" onchange="refreshData()" />
       <span style="font-size: 14px; margin-left: 3px;">days</span>
+      <label style="font-size: 14px; margin-left: 15px; display: flex; align-items: center; cursor: pointer;">
+        <input type="checkbox" id="weekendOnly" checked onchange="refreshData()" style="margin-right: 5px; cursor: pointer;" />
+        Weekend Only
+      </label>
     </div>
     <div class="btn-group">
       <button class="btn" style="font-size:14px" onclick="toggleDebugLog()">🔍 Debug Log</button>
@@ -85,14 +89,16 @@
 
     function refreshData() {
       const maWindow = parseInt(document.getElementById('maWindow').value) || 30;
-      updateStatus(`Refreshing data with MA window: ${maWindow} days...`, 'blue');
+      const weekendOnly = document.getElementById('weekendOnly').checked;
+      updateStatus(`Refreshing data with MA window: ${maWindow} days, Weekend Only: ${weekendOnly}...`, 'blue');
       init();
     }
 
     function init() {
       updateStatus('Step 4: init() function called!', 'green');
       const maWindow = parseInt(document.getElementById('maWindow').value) || 30;
-      updateStatus(`Step 5: Sending request to server (getTimeSpentData) with MA=${maWindow}...`, 'blue');
+      const weekendOnly = document.getElementById('weekendOnly').checked;
+      updateStatus(`Step 5: Sending request to server (getTimeSpentData) with MA=${maWindow}, Weekend Only=${weekendOnly}...`, 'blue');
 
       google.script.run
         .withSuccessHandler(res => {
@@ -131,7 +137,7 @@
            console.error('Full error:', err);
            document.getElementById('chart_div').innerHTML = "<strong style='color:red'>Failed to load data. Check debug log.</strong>";
         })
-        .getTimeSpentData(maWindow);
+        .getTimeSpentData(maWindow, weekendOnly);
     }
 
     function switchOwner(owner) {
