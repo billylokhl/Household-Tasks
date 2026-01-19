@@ -100,7 +100,11 @@ const CONFIG = {
 **Purpose**: Generates visualization data for time trends and incident tracking
 
 **Critical Functions**:
-- `getTimeSpentData()`: Time trend over last 30 days
+- `getTimeSpentData(maWindow, weekendOnly, daysAhead)`: Time trend over last 30 days
+  - **Parameters**:
+    - `maWindow` (number, default 28): Moving average window in days
+    - `weekendOnly` (boolean, default true): If true, MA only considers weekend days
+    - `daysAhead` (number, default 0): Days to look ahead for projected task times
   - **Data Source**: TaskArchive sheet
   - **Column Detection**: Flexible header matching for Ownership🐷/🐱, ECT, Category, CompletionDate
   - **Top Categories**: Top 10 by total time, remainder grouped as "Other"
