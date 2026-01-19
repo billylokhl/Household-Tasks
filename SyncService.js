@@ -131,18 +131,12 @@ function executeFullServerSync() {
       archiveSheet.getRange(archiveSheet.getLastRow() + 1, 1, rowsToAppend.length, rowsToAppend[0].length).setValues(rowsToAppend);
     }
 
-    // Deduplicate archive first
+    // Deduplicate archive
     const archiveResult = pruneArchiveDuplicatesSafe(archiveSheet);
 
-    // Force commit all archive operations before cleanup
     SpreadsheetApp.flush();
 
-    // Now cleanup Prioritization based on what exists in archive
-    // Get fresh sheet reference to ensure we're working with current state
-    const freshSheet = ss.getSheetByName(CONFIG.SHEET.PRIORITIZATION);
-    const cleanupResult = performPrioritizationCleanup(freshSheet, archiveSheet, ss.getSpreadsheetTimeZone());
-
-    return statusMsg + "\n" + archiveResult + "\n" + cleanupResult;
+    return statusMsg + "\n" + archiveResult;
 
   } catch (e) {
     return "Error: " + e.toString();
@@ -360,7 +354,32 @@ function pruneArchiveDuplicatesSafe(sheet) {
 }
 
 /**
- * Handles post-sync cleanup on the Prioritization sheet.
+ * Daily cleanup function to be run on a time-based trigger.
+ * Removes completed tasks from Prioritization based on TaskArchive.
+ * Run this once daily after midnight.
+ */
+function runDailyCleanup() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const priSheet = ss.getSheetByName(CONFIG.SHEET.PRIORITIZATION);
+    const archiveSheet = ss.getSheetByName(CONFIG.SHEET.ARCHIVE);
+
+    if (!priSheet || !archiveSheet) {
+      return "Error: Required sheets not found.";
+    }
+
+    const result = performPrioritizationCleanup(priSheet, archiveSheet, ss.getSpreadsheetTimeZone());
+    Logger.log("Daily cleanup completed: " + result);
+    return result;
+
+  } catch (e) {
+    Logger.log("Daily cleanup error: " + e.toString());
+    return "Error: " + e.toString();
+  }
+}
+
+/**
+ * Handles cleanup on the Prioritization sheet.
  * Checks TaskArchive to see which completed tasks are already archived,
  * then removes non-recurring tasks or clears completion dates for recurring tasks.
  */

@@ -8,7 +8,7 @@ This Google Apps Script project is a household task management system with prior
 **Purpose**: Central hub providing menu access and helper functions
 
 **Critical Functions**:
-- `onOpen()`: MUST restore custom menu "🚀 Task Tools" with items: Planner, View Incident Trend, View Task Time Trend, Sync Task Database, Manual Backup
+- `onOpen()`: MUST restore custom menu "🚀 Task Tools" with items: Planner, View Incident Trend, View Task Time Trend, Sync Task Database, Daily Cleanup, Manual Backup
 - `getSS()`: Returns active spreadsheet instance
 - `findTaskRowInHistory(category, taskName)`: Locates task row in TaskHistory sheet by case-insensitive name match
 - `findDateColInHistory(targetDate)`: Finds date column in TaskHistory sheet using yyyy-MM-dd format matching
@@ -65,7 +65,11 @@ const CONFIG = {
   3. **Completion Filtering**: Only syncs tasks where CompletionDate is not empty
   4. **Archive to Prioritization Sync**: Writes new completed tasks to archive
   5. **Deduplication**: Runs `pruneArchiveDuplicatesSafe` to keep most recent version based on Sync Date
-  6. **Cleanup Workflow**: Calls `performPrioritizationCleanup` after deduplication to remove/clear completed tasks
+  6. **Note**: Does NOT clean up Prioritization (that's handled by `runDailyCleanup`)
+
+- `runDailyCleanup()`: Scheduled daily cleanup function (run after midnight via time-based trigger)
+  - Calls `performPrioritizationCleanup` to process completed tasks
+  - Should be set up as a daily time-based trigger in Apps Script
 
 - `performPrioritizationCleanup(priSheet, archiveSheet, tz)`:
   - Reads TaskArchive to identify all completed tasks (task name + completion date)

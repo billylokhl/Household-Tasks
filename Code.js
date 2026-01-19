@@ -21,6 +21,7 @@ function onOpen() {
     .addItem('View Task Time Trend', 'showTimeTrendModal')
     .addSeparator()
     .addItem('Sync Task Database', 'runUnifiedSync')
+    .addItem('Daily Cleanup', 'runDailyCleanup')
     .addSeparator()
     .addItem('Manual Backup', 'createHourlySnapshot')
     .addToUi();
