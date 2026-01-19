@@ -89,6 +89,13 @@
 
     let allRes = null, currentOwner = 'A', isDarkMode = false;
 
+    // Google Charts default color palette
+    const chartColors = [
+      '#3366cc', '#dc3912', '#ff9900', '#109618', '#990099',
+      '#0099c6', '#dd4477', '#66aa00', '#b82e2e', '#316395',
+      '#994499', '#22aa99', '#aaaa11', '#6633cc', '#e67300'
+    ];
+
     function refreshData() {
       const maWindow = parseInt(document.getElementById('maWindow').value) || 30;
       const weekendOnly = document.getElementById('weekendOnly').checked;
@@ -227,7 +234,8 @@
             gridlines: { color: majorColor },
             minorGridlines: { color: minorColor, count: 1 }
         },
-        tooltip: { isHtml: true, trigger: 'both' }
+        tooltip: { isHtml: true, trigger: 'both' },
+        colors: chartColors.slice(0, numCategories)
       };
 
       const chart = new google.visualization.ComboChart(document.getElementById('chart_div'));
@@ -244,7 +252,8 @@
 
            if (catIndex >= 0 && catIndex < categories.length) {
               const category = categories[catIndex];
-              showTaskDetails(dateLabel, category, detailsSet);
+              const color = chartColors[catIndex % chartColors.length];
+              showTaskDetails(dateLabel, category, detailsSet, color);
            }
         }
       });
@@ -252,14 +261,14 @@
       chart.draw(data, options);
     }
 
-    function showTaskDetails(date, category, details) {
+    function showTaskDetails(date, category, details, color) {
         const container = document.getElementById('task_details_container');
         // Strip the today marker (▶) if present
         const cleanDate = date.replace(/^▶\s*/, '');
         const dayData = details[cleanDate];
         const tasks = (dayData && dayData[category]) ? dayData[category] : [];
 
-        let html = `<div style="font-weight: bold; margin-bottom: 8px;">${category} (${date})</div>`;
+        let html = `<div style="font-weight: bold; margin-bottom: 8px;"><span style="background-color: ${color}; color: white; padding: 4px 8px; border-radius: 4px;">${category}</span> ${date}</div>`;
         if (tasks.length === 0) {
             html += '<div style="font-size: 13px;">No tasks recorded.</div>';
         } else {
