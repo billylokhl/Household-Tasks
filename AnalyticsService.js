@@ -8,15 +8,17 @@
  * Generates data for the Time Trend Chart.
  * @param {number} maWindow - Moving average window in days (default 30)
  * @param {boolean} weekendOnly - If true, MA only considers weekend days (default true)
+ * @param {number} daysAhead - Days to look ahead for projected task times (default 0)
  */
-function getTimeSpentData(maWindow, weekendOnly) {
+function getTimeSpentData(maWindow, weekendOnly, daysAhead) {
   maWindow = maWindow || 28; // Default to 28 days if not provided
   weekendOnly = (weekendOnly === undefined || weekendOnly === null) ? true : weekendOnly;
+  daysAhead = daysAhead || 0; // Default to 0 days ahead
   const debugLog = [];
   const log = (msg) => debugLog.push(`[${new Date().toLocaleTimeString()}] ${msg}`);
 
   try {
-    log(`Starting getTimeSpentData with MA window=${maWindow}, Weekend Only=${weekendOnly}...`);
+    log(`Starting getTimeSpentData with MA window=${maWindow}, Weekend Only=${weekendOnly}, Days Ahead=${daysAhead}...`);
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const archive = ss.getSheetByName(CONFIG.SHEET.ARCHIVE);
     if (!archive) return { error: "Archive missing. Please run Sync first." };
@@ -95,8 +97,10 @@ function getTimeSpentData(maWindow, weekendOnly) {
     const tz = ss.getSpreadsheetTimeZone();
     const timelineLabels = [];
     const timelineData = { Billy: {}, Karen: {} };
+    const totalDays = 30 + daysAhead;
+    const todayIndex = 29; // Index of today in the timeline (0-based)
 
-    // 2. Initialize Last 30 Days with weekend flag
+    // 2. Initialize Last 30 Days + Future Days with weekend flag
     const timelineDates = []; // Store actual Date objects for weekend checking
     for (let i = 29; i >= 0; i--) {
       let d = new Date(); d.setDate(d.getDate() - i);
@@ -104,7 +108,22 @@ function getTimeSpentData(maWindow, weekendOnly) {
       let label = Utilities.formatDate(d, tz, "MM/dd (E)");
       timelineLabels.push(label);
       ["Billy", "Karen"].forEach(p => {
-        timelineData[p][label] = { total: 0, catBreakdown: {}, taskDetails: {} };
+        timelineData[p][label] = { total: 0, catBreakdown: {}, taskDetails: {}, isFuture: false };
+        finalCategories.forEach(c => {
+           timelineData[p][label][c] = 0;
+           timelineData[p][label].taskDetails[c] = [];
+        });
+      });
+    }
+
+    // Add future days if daysAhead > 0
+    for (let i = 1; i <= daysAhead; i++) {
+      let d = new Date(); d.setDate(d.getDate() + i);
+      timelineDates.push(d);
+      let label = Utilities.formatDate(d, tz, "MM/dd (E)");
+      timelineLabels.push(label);
+      ["Billy", "Karen"].forEach(p => {
+        timelineData[p][label] = { total: 0, catBreakdown: {}, taskDetails: {}, isFuture: true };
         finalCategories.forEach(c => {
            timelineData[p][label][c] = 0;
            timelineData[p][label].taskDetails[c] = [];
@@ -198,6 +217,7 @@ function getTimeSpentData(maWindow, weekendOnly) {
       finalCategories.forEach(c => {
         header.push({label: c, type: 'number'});
         header.push({ type: 'string', role: 'tooltip', p: {html: true} });
+        header.push({ type: 'string', role: 'style' }); // Add style role for patterns
       });
       // Add moving average column
       header.push({label: `${maWindow}d MA`, type: 'number'});
@@ -222,11 +242,22 @@ function getTimeSpentData(maWindow, weekendOnly) {
         });
         tooltip += `<tr class="chart-total"><td class="chart-pt"><b>TOTAL:</b></td><td class="chart-val chart-pt"><b>${dayData.total}m</b></td></tr></table></div>`;
 
-        let row = [lb];
-        finalCategories.forEach(c => {
+        // Add marker to today's date
+        let dateLabel = lb;
+        if (idx === todayIndex) {
+          dateLabel = `▶ ${lb}`; // Add triangle marker before today's date
+        }
+
+        let row = [dateLabel];
+        const isFuture = dayData.isFuture;
+
+        finalCategories.forEach((c, catIdx) => {
           let v = dayData[c] || 0;
           row.push(v === 0 ? null : v);
           row.push(tooltip);
+          // Use translucent fill for future data (Google Charts doesn't support patterns)
+          const style = isFuture ? 'opacity: 0.5;' : null;
+          row.push(style);
         });
 
         // Calculate moving average for this day
@@ -247,6 +278,7 @@ function getTimeSpentData(maWindow, weekendOnly) {
         const maValue = maCount > 0 ? (maSum / maCount) : null;
         row.push(maValue);
 
+
         arr.push(row);
       });
 
@@ -257,6 +289,89 @@ function getTimeSpentData(maWindow, weekendOnly) {
 
     log(`Stats: Total Rows=${data.length}, Valid Dates=${validDateCount}, Inside 30-Day Window=${inRangeCount}`);
 
+    // 4. Populate Future Days from Prioritization Sheet
+    if (daysAhead > 0) {
+      const prioritization = ss.getSheetByName(CONFIG.SHEET.PRIORITIZATION);
+      if (prioritization) {
+        const prioData = prioritization.getDataRange().getValues();
+        const prioHeaders = prioData[0];
+
+        const prioGetIdx = (t) => {
+          const search = normalize(t);
+          return prioHeaders.findIndex(hdr => normalize(hdr).includes(search));
+        };
+
+        const prioTaskIdx = prioGetIdx("Task");
+        const prioCatIdx = prioGetIdx("Category");
+        const prioEctIdx = prioGetIdx("ECT");
+        const prioDueDateIdx = prioGetIdx("DueDate");
+        let prioBillyIdx = prioGetIdx("OwnershipBilly");
+        if (prioBillyIdx === -1) prioBillyIdx = prioGetIdx("Ownership🐷");
+        if (prioBillyIdx === -1) prioBillyIdx = prioGetIdx("Billy");
+        if (prioBillyIdx === -1) prioBillyIdx = prioGetIdx("🐷");
+
+        let prioKarenIdx = prioGetIdx("OwnershipKaren");
+        if (prioKarenIdx === -1) prioKarenIdx = prioGetIdx("Ownership🐱");
+        if (prioKarenIdx === -1) prioKarenIdx = prioGetIdx("Karen");
+        if (prioKarenIdx === -1) prioKarenIdx = prioGetIdx("🐱");
+
+        log(`Prioritization Indexes -> Task:${prioTaskIdx}, Cat:${prioCatIdx}, ECT:${prioEctIdx}, DueDate:${prioDueDateIdx}, Billy:${prioBillyIdx}, Karen:${prioKarenIdx}`);
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const futureEnd = new Date();
+        futureEnd.setDate(futureEnd.getDate() + daysAhead);
+        futureEnd.setHours(23, 59, 59, 999);
+
+        for (let i = 1; i < prioData.length; i++) {
+          const row = prioData[i];
+          let dueDate = row[prioDueDateIdx];
+
+          if (typeof dueDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dueDate)) {
+            dueDate = Utilities.parseDate(dueDate, tz, "yyyy-MM-dd");
+          } else {
+            dueDate = safeParseDate(dueDate);
+          }
+
+          if (!dueDate || dueDate <= today || dueDate > futureEnd) continue;
+
+          const label = Utilities.formatDate(dueDate, tz, "MM/dd (E)");
+          if (!timelineData.Billy[label]) continue;
+
+          const bRaw = row[prioBillyIdx];
+          const kRaw = row[prioKarenIdx];
+          const isBilly = (bRaw === true || String(bRaw).toUpperCase().includes("TRUE") || String(bRaw).includes("🐷") || String(bRaw).toLowerCase() === "yes");
+          const isKaren = (kRaw === true || String(kRaw).toUpperCase().includes("TRUE") || String(kRaw).includes("🐱") || String(kRaw).toLowerCase() === "yes");
+
+          const mins = parseTimeValue(row[prioEctIdx]);
+          const rawCat = String(row[prioCatIdx] || "Uncategorized").trim();
+          const taskName = String(row[prioTaskIdx] || "Unknown Task");
+          let displayCat = topCats.includes(rawCat) ? rawCat : "Other";
+
+          if (mins > 0) {
+            if (isBilly) {
+              timelineData.Billy[label][displayCat] += mins;
+              timelineData.Billy[label].total += mins;
+              timelineData.Billy[label].catBreakdown[rawCat] = (timelineData.Billy[label].catBreakdown[rawCat] || 0) + mins;
+              if (!timelineData.Billy[label].taskDetails[displayCat]) timelineData.Billy[label].taskDetails[displayCat] = [];
+              timelineData.Billy[label].taskDetails[displayCat].push({ task: taskName, mins: mins });
+            }
+            if (isKaren) {
+              timelineData.Karen[label][displayCat] += mins;
+              timelineData.Karen[label].total += mins;
+              timelineData.Karen[label].catBreakdown[rawCat] = (timelineData.Karen[label].catBreakdown[rawCat] || 0) + mins;
+              if (!timelineData.Karen[label].taskDetails[displayCat]) timelineData.Karen[label].taskDetails[displayCat] = [];
+              timelineData.Karen[label].taskDetails[displayCat].push({ task: taskName, mins: mins });
+            }
+          }
+        }
+
+        log(`Populated ${daysAhead} future days from Prioritization sheet`);
+      } else {
+        log("WARNING: Prioritization sheet not found, skipping future projections");
+      }
+    }
+
     return {
         ownerNames: ["🐷", "🐱"],
         dataA: buildArray("Billy").array,
@@ -265,6 +380,7 @@ function getTimeSpentData(maWindow, weekendOnly) {
         dataB: buildArray("Karen").array,
         detailsB: buildArray("Karen").details,
         catsB: buildArray("Karen").categories,
+        todayIndex: todayIndex,
         logs: debugLog
     };
   } catch (e) { return { error: e.toString(), logs: debugLog }; }

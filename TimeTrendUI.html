@@ -37,6 +37,8 @@
         <input type="checkbox" id="weekendOnly" checked onchange="refreshData()" style="margin-right: 5px; cursor: pointer;" />
         Weekend Only
       </label>
+      <label style="font-size: 14px; margin-left: 15px; margin-right: 5px;">Days to Look Ahead:</label>
+      <input type="number" id="daysAhead" value="7" min="0" max="30" style="width: 60px; padding: 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--text);" onchange="refreshData()" />
     </div>
     <div class="btn-group">
       <button class="btn" style="font-size:14px" onclick="toggleDebugLog()">🔍 Debug Log</button>
@@ -90,7 +92,8 @@
     function refreshData() {
       const maWindow = parseInt(document.getElementById('maWindow').value) || 30;
       const weekendOnly = document.getElementById('weekendOnly').checked;
-      updateStatus(`Refreshing data with MA window: ${maWindow} days, Weekend Only: ${weekendOnly}...`, 'blue');
+      const daysAhead = parseInt(document.getElementById('daysAhead').value) || 0;
+      updateStatus(`Refreshing data with MA window: ${maWindow} days, Weekend Only: ${weekendOnly}, Days Ahead: ${daysAhead}...`, 'blue');
       init();
     }
 
@@ -98,7 +101,8 @@
       updateStatus('Step 4: init() function called!', 'green');
       const maWindow = parseInt(document.getElementById('maWindow').value) || 30;
       const weekendOnly = document.getElementById('weekendOnly').checked;
-      updateStatus(`Step 5: Sending request to server (getTimeSpentData) with MA=${maWindow}, Weekend Only=${weekendOnly}...`, 'blue');
+      const daysAhead = parseInt(document.getElementById('daysAhead').value) || 0;
+      updateStatus(`Step 5: Sending request to server (getTimeSpentData) with MA=${maWindow}, Weekend Only=${weekendOnly}, Days Ahead=${daysAhead}...`, 'blue');
 
       google.script.run
         .withSuccessHandler(res => {
@@ -137,7 +141,7 @@
            console.error('Full error:', err);
            document.getElementById('chart_div').innerHTML = "<strong style='color:red'>Failed to load data. Check debug log.</strong>";
         })
-        .getTimeSpentData(maWindow, weekendOnly);
+        .getTimeSpentData(maWindow, weekendOnly, daysAhead);
     }
 
     function switchOwner(owner) {
@@ -200,6 +204,8 @@
       // Build series configuration - all categories as bars except last one (MA) as line
       const seriesConfig = {};
       const numCategories = categories.length;
+      const todayIndex = allRes.todayIndex || -1; // Index where today ends
+
       for (let i = 0; i < numCategories; i++) {
         seriesConfig[i] = { type: 'bars' };
       }
@@ -233,7 +239,8 @@
            if (e.row == null || e.column == null) return;
 
            const dateLabel = data.getValue(e.row, 0);
-           const catIndex = Math.floor((e.column - 1) / 2);
+           // Account for 3 columns per category (value, tooltip, style)
+           const catIndex = Math.floor((e.column - 1) / 3);
 
            if (catIndex >= 0 && catIndex < categories.length) {
               const category = categories[catIndex];
