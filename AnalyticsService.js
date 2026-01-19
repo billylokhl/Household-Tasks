@@ -6,13 +6,15 @@
 /**
  * TIME TREND ENGINE
  * Generates data for the Time Trend Chart.
+ * @param {number} maWindow - Moving average window in days (default 30)
  */
-function getTimeSpentData() {
+function getTimeSpentData(maWindow) {
+  maWindow = maWindow || 30; // Default to 30 days if not provided
   const debugLog = [];
   const log = (msg) => debugLog.push(`[${new Date().toLocaleTimeString()}] ${msg}`);
 
   try {
-    log("Starting getTimeSpentData...");
+    log(`Starting getTimeSpentData with MA window=${maWindow}...`);
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const archive = ss.getSheetByName(CONFIG.SHEET.ARCHIVE);
     if (!archive) return { error: "Archive missing. Please run Sync first." };
@@ -193,13 +195,18 @@ function getTimeSpentData() {
         header.push({label: c, type: 'number'});
         header.push({ type: 'string', role: 'tooltip', p: {html: true} });
       });
+      // Add moving average column
+      header.push({label: `${maWindow}d MA`, type: 'number'});
 
       let arr = [header];
       let details = {};
 
       let hasData = false;
 
-      timelineLabels.forEach(lb => {
+      // Calculate total time per day for moving average
+      const dailyTotals = timelineLabels.map(lb => timelineData[p][lb].total);
+
+      timelineLabels.forEach((lb, idx) => {
         const dayData = timelineData[p][lb];
         details[lb] = dayData.taskDetails;
 
@@ -217,6 +224,17 @@ function getTimeSpentData() {
           row.push(v === 0 ? null : v);
           row.push(tooltip);
         });
+
+        // Calculate moving average for this day
+        let maSum = 0;
+        let maCount = 0;
+        for (let j = 0; j < maWindow && idx - j >= 0; j++) {
+          maSum += dailyTotals[idx - j];
+          maCount++;
+        }
+        const maValue = maCount > 0 ? (maSum / maCount) : null;
+        row.push(maValue);
+
         arr.push(row);
       });
 

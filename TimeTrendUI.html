@@ -29,6 +29,11 @@
       <button id="btnA" class="btn active" onclick="switchOwner('A')">🐷</button>
       <button id="btnB" class="btn" onclick="switchOwner('B')">🐱</button>
     </div>
+    <div class="btn-group" style="align-items: center;">
+      <label style="font-size: 14px; margin-right: 5px;">MA Window:</label>
+      <input type="number" id="maWindow" value="30" min="2" max="29" style="width: 60px; padding: 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--text);" onchange="refreshData()" />
+      <span style="font-size: 14px; margin-left: 3px;">days</span>
+    </div>
     <div class="btn-group">
       <button class="btn" style="font-size:14px" onclick="toggleDebugLog()">🔍 Debug Log</button>
       <button class="btn" style="font-size:14px" onclick="toggleTheme()">🌓 Theme</button>
@@ -78,9 +83,16 @@
 
     let allRes = null, currentOwner = 'A', isDarkMode = false;
 
+    function refreshData() {
+      const maWindow = parseInt(document.getElementById('maWindow').value) || 30;
+      updateStatus(`Refreshing data with MA window: ${maWindow} days...`, 'blue');
+      init();
+    }
+
     function init() {
       updateStatus('Step 4: init() function called!', 'green');
-      updateStatus('Step 5: Sending request to server (getTimeSpentData)...', 'blue');
+      const maWindow = parseInt(document.getElementById('maWindow').value) || 30;
+      updateStatus(`Step 5: Sending request to server (getTimeSpentData) with MA=${maWindow}...`, 'blue');
 
       google.script.run
         .withSuccessHandler(res => {
@@ -119,7 +131,7 @@
            console.error('Full error:', err);
            document.getElementById('chart_div').innerHTML = "<strong style='color:red'>Failed to load data. Check debug log.</strong>";
         })
-        .getTimeSpentData();
+        .getTimeSpentData(maWindow);
     }
 
     function switchOwner(owner) {
@@ -179,7 +191,18 @@
       const majorColor = isDarkMode ? '#94a3b8' : '#64748b'; // Thick/Dark for labeled
       const minorColor = isDarkMode ? '#1e293b' : '#e2e8f0'; // Thin/Light for unlabeled
 
+      // Build series configuration - all categories as bars except last one (MA) as line
+      const seriesConfig = {};
+      const numCategories = categories.length;
+      for (let i = 0; i < numCategories; i++) {
+        seriesConfig[i] = { type: 'bars' };
+      }
+      // Last series is the moving average line
+      seriesConfig[numCategories] = { type: 'line', lineWidth: 3, pointSize: 0, color: '#f59e0b', lineDashStyle: [4, 4] };
+
       const options = {
+        seriesType: 'bars',
+        series: seriesConfig,
         isStacked: true,
         backgroundColor: 'transparent',
         chartArea: { width: '92%', height: '65%', left: 60, right: 20, bottom: 120 },
@@ -195,7 +218,7 @@
         tooltip: { isHtml: true, trigger: 'both' }
       };
 
-      const chart = new google.visualization.ColumnChart(document.getElementById('chart_div'));
+      const chart = new google.visualization.ComboChart(document.getElementById('chart_div'));
 
       google.visualization.events.addListener(chart, 'select', () => {
         const selection = chart.getSelection();
