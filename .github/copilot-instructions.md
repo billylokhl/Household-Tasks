@@ -211,9 +211,51 @@ Each commit message consists of a **header**, a **body**, and a **footer**. The 
 
 ## Atomic Commits
 
-- Structure unstaged changes into a series of focused commits where sensible.
-- Each commit should be suitably focused and avoid including too many unrelated changes.
-- Stage specific hunks within the same file and commit them separately if they belong to different logical changes.
+**CRITICAL**: Always break unstaged changes into atomic, focused commits. This is MANDATORY, not optional.
+
+### When to Create Separate Commits
+
+1. **Different features** - Each new feature should be its own commit
+2. **Different files with different purposes** - UI changes vs server logic vs configuration
+3. **Within the same file** - Use `git add -p` to stage specific hunks that belong to different logical changes
+4. **Bug fixes vs features** - Never mix bug fixes with new features
+5. **Refactoring vs functionality** - Keep refactoring separate from functional changes
+
+### How to Stage Hunks
+
+Use `git add -p <file>` (or `git add --patch <file>`) to interactively stage specific changes:
+- Press `y` to stage a hunk
+- Press `n` to skip a hunk
+- Press `s` to split a hunk into smaller pieces
+- Press `e` to manually edit a hunk
+
+### Examples of Proper Atomic Commits
+
+**GOOD - Separate commits:**
+```
+Commit 1: feat(analytics): add moving average calculation to time trend
+Commit 2: feat(analytics): add weekend-only filter for moving average
+Commit 3: feat(analytics): add days-ahead projection for future tasks
+Commit 4: style(analytics): change default MA window to 28 days
+```
+
+**BAD - One large commit:**
+```
+Commit 1: feat(analytics): add moving average, weekend filter, projections, and UI changes
+```
+
+### Workflow for Multiple Changes
+
+1. Review all unstaged changes: `git status` and `git diff`
+2. Identify logical groupings of changes
+3. For each logical group:
+   - Stage only those changes: `git add -p <files>`
+   - Commit with focused message: `git commit -m "type(scope): description"`
+4. Repeat until all changes are committed
+
+### Rule of Thumb
+
+If your commit message needs "and" or multiple bullet points covering different topics, you should split it into multiple commits.
 
 ## Header
 
