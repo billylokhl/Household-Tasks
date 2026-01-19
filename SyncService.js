@@ -101,6 +101,7 @@ function executeFullServerSync() {
 
     const syncTimestamp = new Date();
     const rowsToAppend = [];
+    const syncedRowIndices = []; // Track which rows were synced
     let scannedCount = 0;
 
     for (let r = 1; r < fullData.length; r++) {
@@ -120,6 +121,7 @@ function executeFullServerSync() {
           rowArr.push(v);
         });
         rowsToAppend.push(rowArr);
+        syncedRowIndices.push(r); // Track this row index
       }
     }
 
@@ -127,13 +129,20 @@ function executeFullServerSync() {
 
     if (rowsToAppend.length > 0) {
       archiveSheet.getRange(archiveSheet.getLastRow() + 1, 1, rowsToAppend.length, rowsToAppend[0].length).setValues(rowsToAppend);
-
-      // Perform cleanup on Prioritization sheet (delete non-recurring, clear fields on recurring)
-      performPrioritizationCleanup(sheet, fullData, colMap, completionMapping, taskMapping);
     }
 
+    // Deduplicate archive first
     const archiveResult = pruneArchiveDuplicatesSafe(archiveSheet);
-    return statusMsg + "\n" + archiveResult;
+
+    // Force commit all archive operations before cleanup
+    SpreadsheetApp.flush();
+
+    // Now cleanup Prioritization based on what exists in archive
+    // Get fresh sheet reference to ensure we're working with current state
+    const freshSheet = ss.getSheetByName(CONFIG.SHEET.PRIORITIZATION);
+    const cleanupResult = performPrioritizationCleanup(freshSheet, archiveSheet, ss.getSpreadsheetTimeZone());
+
+    return statusMsg + "\n" + archiveResult + "\n" + cleanupResult;
 
   } catch (e) {
     return "Error: " + e.toString();
@@ -316,11 +325,20 @@ function pruneArchiveDuplicatesSafe(sheet) {
     // Deduplication Key (Task + CompletionDate)
     const key = taskName + "|" + completionStr;
 
-    const currentSyncTime = row[0] instanceof Date ? row[0].getTime() : new Date(row[0]).getTime();
+    // Parse Sync Date (first column) and get timestamp
+    let currentSyncTime = 0;
+    const syncVal = row[0];
+    if (syncVal instanceof Date) {
+      currentSyncTime = syncVal.getTime();
+    } else if (syncVal) {
+      const parsed = new Date(syncVal);
+      currentSyncTime = !isNaN(parsed.getTime()) ? parsed.getTime() : 0;
+    }
 
-    // Keep if new, or if this row has a newer Sync Date than what we have stored
+    // Keep the row with the most recent (latest) Sync Date
+    // If this is the first occurrence OR this row has a newer Sync Date, keep it
     if (!uniqueMap.has(key) || currentSyncTime > uniqueMap.get(key).time) {
-      uniqueMap.set(key, { time: currentSyncTime || 0, data: row });
+      uniqueMap.set(key, { time: currentSyncTime, data: row });
     }
   }
 
@@ -343,67 +361,131 @@ function pruneArchiveDuplicatesSafe(sheet) {
 
 /**
  * Handles post-sync cleanup on the Prioritization sheet.
- * - Clears Incident fields for all synced tasks.
- * - Deletes synced tasks if they are non-recurring.
- * - Clears specific completion dates (🐱/🐷) for recurring tasks.
+ * Checks TaskArchive to see which completed tasks are already archived,
+ * then removes non-recurring tasks or clears completion dates for recurring tasks.
  */
-function performPrioritizationCleanup(sheet, fullData, colMap, completionMapping, taskMapping) {
-  const getColIndex = (name) => {
-    const m = colMap.find(c => c.name.toLowerCase() === name.toLowerCase());
-    return m ? m.col : -1;
-  };
+function performPrioritizationCleanup(priSheet, archiveSheet, tz) {
+  // Read archive data to build lookup map
+  const archiveData = archiveSheet.getDataRange().getValues();
+  if (archiveData.length <= 1) return "Cleanup: No archive data to check against.";
 
-  const incidentDateCol = getColIndex("IncidentDate");
-  const recurrenceCol = getColIndex("Recurrence");
-  const completionCatCol = getColIndex("CompletionDate🐱");
-  const completionPigCol = getColIndex("CompletionDate🐷");
+  const archiveHeaders = archiveData[0];
+  const findArchiveIdx = (term) => archiveHeaders.findIndex(h =>
+    String(h).toLowerCase().replace(/\s/g, '').includes(term.toLowerCase().replace(/\s/g, ''))
+  );
+
+  const archTaskIdx = archiveHeaders.findIndex(h => String(h).toLowerCase() === "task");
+  const archCompletionIdx = findArchiveIdx("completiondate");
+
+  if (archTaskIdx === -1) return "Cleanup: Cannot find Task column in archive.";
+
+  // Build set of archived task+completionDate keys
+  const archivedKeys = new Set();
+  for (let i = 1; i < archiveData.length; i++) {
+    const taskName = String(archiveData[i][archTaskIdx]).trim().toLowerCase();
+    let completionStr = "";
+    if (archCompletionIdx !== -1) {
+      let v = archiveData[i][archCompletionIdx];
+      if (v instanceof Date) {
+        completionStr = Utilities.formatDate(v, tz, "yyyy-MM-dd");
+      } else {
+        completionStr = String(v).trim();
+      }
+    }
+    const key = taskName + "|" + completionStr;
+    archivedKeys.add(key);
+  }
+
+  // Read Prioritization sheet
+  const priData = priSheet.getDataRange().getValues();
+  if (priData.length <= 1) return "Cleanup: Prioritization sheet is empty.";
+
+  const priHeaders = priData[0];
+  const findPriIdx = (term) => priHeaders.findIndex(h =>
+    String(h).toLowerCase().replace(/\s/g, '').includes(term.toLowerCase().replace(/\s/g, ''))
+  );
+
+  const priTaskIdx = priHeaders.findIndex(h => String(h).toLowerCase() === "task");
+  const priCompletionIdx = findPriIdx("completiondate");
+  const priRecurrenceIdx = priHeaders.findIndex(h => String(h).toLowerCase() === "recurrence");
+  const priIncidentIdx = priHeaders.findIndex(h => String(h).toLowerCase() === "incidentdate");
+  const priCompletionCatIdx = findPriIdx("completiondate🐱");
+  const priCompletionPigIdx = findPriIdx("completiondate🐷");
+
+  if (priTaskIdx === -1) return "Cleanup: Cannot find Task column in Prioritization.";
 
   const rowsToDelete = [];
   const cellsToClear = [];
 
-  // Iterate backwards to safe-guard row indices for deletion
-  for (let r = fullData.length - 1; r >= 1; r--) {
-     const taskVal = fullData[r][taskMapping.col - 1];
-     const completionVal = completionMapping ? fullData[r][completionMapping.col - 1] : "";
-     const isCompleted = completionMapping ? (completionVal && String(completionVal).trim() !== "") : true;
+  // Iterate backwards for safe deletion
+  for (let r = priData.length - 1; r >= 1; r--) {
+    const taskName = String(priData[r][priTaskIdx]).trim().toLowerCase();
+    if (!taskName) continue;
 
-     // Identify if this row was synced
-     if (taskVal && String(taskVal).trim() !== "" && isCompleted) {
-        const rowIndex = r + 1; // 1-based index
+    // Get completion date
+    let completionStr = "";
+    if (priCompletionIdx !== -1) {
+      let v = priData[r][priCompletionIdx];
+      if (v instanceof Date) {
+        completionStr = Utilities.formatDate(v, tz, "yyyy-MM-dd");
+      } else {
+        completionStr = String(v).trim();
+      }
+    }
 
-        const recurrenceVal = recurrenceCol !== -1 ? fullData[r][recurrenceCol - 1] : "";
-        const isRecurring = recurrenceVal && String(recurrenceVal).trim() !== "";
+    // Skip if not completed
+    if (!completionStr) continue;
 
-        // CRITICAL UPDATE: Never delete tasks that have an IncidentDate
-        const incidentDateVal = incidentDateCol !== -1 ? fullData[r][incidentDateCol - 1] : "";
-        const hasIncident = incidentDateVal && String(incidentDateVal).trim() !== "";
+    // Check if this task+completion exists in archive
+    const key = taskName + "|" + completionStr;
+    if (!archivedKeys.has(key)) continue; // Not in archive, skip
 
-        if (hasIncident) {
-           // Do nothing - preserve task completely
-           continue;
-        }
+    // This task is in archive, decide cleanup action
+    const rowIndex = r + 1; // 1-based
 
-        if (isRecurring) {
-           // Recurring: Keep row, strictly clear specific fields as requested
-           // 1. Clear specific completion dates (🐱/🐷)
-           [completionCatCol, completionPigCol].forEach(col => {
-              if (col !== -1) cellsToClear.push(sheet.getRange(rowIndex, col).getA1Notation());
-           });
-        } else {
-           // Non-recurring: Delete row.
-           rowsToDelete.push(rowIndex);
-        }
-     }
+    const recurrenceVal = priRecurrenceIdx !== -1 ? priData[r][priRecurrenceIdx] : "";
+    const isRecurring = recurrenceVal && String(recurrenceVal).trim() !== "";
+
+    const incidentVal = priIncidentIdx !== -1 ? priData[r][priIncidentIdx] : "";
+    const hasIncident = incidentVal && String(incidentVal).trim() !== "";
+
+    if (isRecurring) {
+      // Recurring: Clear completion dates (col index is 0-based, need to add 1 for column number)
+      if (priCompletionCatIdx !== -1) {
+        cellsToClear.push(priSheet.getRange(rowIndex, priCompletionCatIdx + 1).getA1Notation());
+      }
+      if (priCompletionPigIdx !== -1) {
+        cellsToClear.push(priSheet.getRange(rowIndex, priCompletionPigIdx + 1).getA1Notation());
+      }
+    } else if (!hasIncident) {
+      // Non-recurring without incident: Delete
+      rowsToDelete.push(rowIndex);
+    }
+    // Non-recurring with incident: Preserve
   }
 
   // Batch clear cells
   if (cellsToClear.length > 0) {
-     sheet.getRangeList(cellsToClear).clearContent();
+    priSheet.getRangeList(cellsToClear).clearContent();
   }
 
-  // Delete rows (Delete from bottom up to avoid index shifts)
-  // rowsToDelete was populated by iterating backwards, so it is already sorted Descending.
-  rowsToDelete.forEach(rowIndex => {
-     sheet.deleteRow(rowIndex);
-  });
+  // Delete rows - clear content first, then delete physical row
+  // rowsToDelete is already sorted in descending order
+  if (rowsToDelete.length > 0) {
+    for (let i = 0; i < rowsToDelete.length; i++) {
+      const rowIndex = rowsToDelete[i];
+      try {
+        // Clear row content first (removes content, formatting, and validation)
+        priSheet.getRange(rowIndex, 1, 1, priSheet.getLastColumn()).clear();
+        // Delete the physical row
+        priSheet.deleteRow(rowIndex);
+      } catch (e) {
+        Logger.log(`ERROR deleting row ${rowIndex}: ${e.toString()}`);
+      }
+    }
+  }
+
+  SpreadsheetApp.flush();
+
+  return `Cleanup: Cleared ${cellsToClear.length} field(s), deleted ${rowsToDelete.length} row(s).`;
 }

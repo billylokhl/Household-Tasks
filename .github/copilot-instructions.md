@@ -63,20 +63,22 @@ const CONFIG = {
   1. **Dynamic Column Detection**: Scans headers to build column map
   2. **Schema Migration**: Auto-heals Archive structure when columns change, preserving existing data by remapping
   3. **Completion Filtering**: Only syncs tasks where CompletionDate is not empty
-  4. **Deduplication**: Keeps most recent version based on Sync Date
-  5. **Archive Structure**: First column is "Sync Date", followed by all Prioritization columns
-  6. **Cleanup Workflow**: Calls `performPrioritizationCleanup` after archiving
+  4. **Archive to Prioritization Sync**: Writes new completed tasks to archive
+  5. **Deduplication**: Runs `pruneArchiveDuplicatesSafe` to keep most recent version based on Sync Date
+  6. **Cleanup Workflow**: Calls `performPrioritizationCleanup` after deduplication to remove/clear completed tasks
 
-- `performPrioritizationCleanup(sheet, fullData, colMap, completionMapping, taskMapping)`:
-  - **CRITICAL**: NEVER delete tasks with IncidentDate (preserve for incident tracking)
-  - **Non-recurring tasks**: Delete entirely from Prioritization
+- `performPrioritizationCleanup(priSheet, archiveSheet, tz)`:
+  - Reads TaskArchive to identify all completed tasks (task name + completion date)
+  - Scans Prioritization sheet for tasks that exist in archive
+  - **Non-recurring tasks without incidents**: Delete entirely from Prioritization (uses `.clear()` then `deleteRow()`)
   - **Recurring tasks**: Keep row, clear only CompletionDate🐱 and CompletionDate🐷 fields
+  - **Tasks with IncidentDate**: NEVER delete (preserve for incident tracking)
   - Process rows in reverse order to handle deletions safely
 
 - `pruneArchiveDuplicatesSafe(sheet)`:
-  - Deduplication key: Task name + CompletionDate
-  - Keep row with most recent Sync Date
-  - Filter out rows without CompletionDate
+  - Deduplication key: Task name (lowercase) + CompletionDate (yyyy-MM-dd format)
+  - Keep row with most recent Sync Date timestamp
+  - Robust sync date parsing (handles Date objects and strings)
 
 ### 5. DayPlanner.js - Task Planning Interface
 **Purpose**: Provides filtered view of upcoming tasks for daily planning
