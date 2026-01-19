@@ -141,7 +141,115 @@ function executeFullServerSync() {
 }
 
 /**
+ * Comprehensive data integrity validation for archive records.
+ * Returns an object with validation results.
+ */
+function validateArchiveRecord(row, headers, rowIndex, tz) {
+  const issues = [];
+  const findIdx = (term) => headers.findIndex(h => String(h).toLowerCase().replace(/\s/g, '').includes(term.toLowerCase().replace(/\s/g, '')));
+
+  // Map column indices
+  const taskIdx = findIdx("task");
+  const categoryIdx = findIdx("category");
+  const completionIdx = findIdx("completiondate");
+  const incidentDateIdx = findIdx("incidentdate");
+  const incidentOwnerIdx = findIdx("incidentowner");
+  const ectIdx = findIdx("ect");
+  const ownership1Idx = headers.findIndex(h => String(h).toLowerCase().includes("ownership") && h.includes("🐷"));
+  const ownership2Idx = headers.findIndex(h => String(h).toLowerCase().includes("ownership") && h.includes("🐱"));
+
+  // Helper to safely get cell value
+  const getValue = (idx) => (idx !== -1 && idx < row.length) ? row[idx] : "";
+
+  // Helper to parse date
+  const parseDate = (val) => {
+    if (val instanceof Date) return val;
+    if (!val || String(val).trim() === "") return null;
+    const parsed = new Date(val);
+    return isNaN(parsed.getTime()) ? null : parsed;
+  };
+
+  // 1. Task name required
+  const taskName = String(getValue(taskIdx)).trim();
+  if (!taskName) {
+    issues.push("Missing task name");
+  }
+
+  // 2. Category required (critical for analytics)
+  const category = String(getValue(categoryIdx)).trim();
+  if (!category) {
+    issues.push("Missing category");
+  }
+
+  // 3. CompletionDate required and valid
+  const completionVal = getValue(completionIdx);
+  const completionDate = parseDate(completionVal);
+  if (!completionDate) {
+    issues.push("Missing or invalid CompletionDate");
+  } else {
+    // 4. CompletionDate not in future
+    const now = new Date();
+    if (completionDate > now) {
+      issues.push(`CompletionDate in future: ${Utilities.formatDate(completionDate, tz, "yyyy-MM-dd")}`);
+    }
+  }
+
+  // 5. Sync Date integrity (first column)
+  const syncDate = parseDate(row[0]);
+  if (!syncDate) {
+    issues.push("Invalid Sync Date");
+  }
+
+  // 6. IncidentDate validation (if present)
+  const incidentVal = getValue(incidentDateIdx);
+  if (incidentVal && String(incidentVal).trim() !== "") {
+    const incidentDate = parseDate(incidentVal);
+    if (!incidentDate) {
+      issues.push("Invalid IncidentDate format");
+    } else if (completionDate && incidentDate > completionDate) {
+      issues.push("IncidentDate after CompletionDate");
+    }
+
+    // Must have IncidentOwner
+    const incidentOwner = String(getValue(incidentOwnerIdx)).trim();
+    if (!incidentOwner) {
+      issues.push("IncidentDate present but missing IncidentOwner");
+    }
+  }
+
+  // 7. Owner validation - at least one ownership should be "Yes" or TRUE
+  const owner1Val = getValue(ownership1Idx);
+  const owner2Val = getValue(ownership2Idx);
+  const hasOwner1 = owner1Val === true || String(owner1Val).trim().toLowerCase() === "yes";
+  const hasOwner2 = owner2Val === true || String(owner2Val).trim().toLowerCase() === "yes";
+  if (!hasOwner1 && !hasOwner2) {
+    issues.push("No owner assigned (neither 🐷 nor 🐱)");
+  }
+
+  // 8. ECT sanity check (if present)
+  const ectVal = getValue(ectIdx);
+  if (ectVal && String(ectVal).trim() !== "") {
+    try {
+      const ectMins = parseTimeValue(ectVal);
+      if (ectMins < 0) {
+        issues.push("Negative ECT value");
+      }
+    } catch (e) {
+      issues.push(`Invalid ECT format: ${ectVal}`);
+    }
+  }
+
+  return {
+    isValid: issues.length === 0,
+    issues: issues,
+    taskName: taskName,
+    rowIndex: rowIndex
+  };
+}
+
+/**
  * Removes duplicate entries from the Archive, keeping the most recent version.
+ * Includes comprehensive data integrity validation.
  */
 function pruneArchiveDuplicatesSafe(sheet) {
   const data = sheet.getDataRange().getValues();
@@ -159,8 +267,36 @@ function pruneArchiveDuplicatesSafe(sheet) {
 
   if (taskIdx === -1) return "Sync Complete (Warning: 'Task' column not found for deduplication).";
 
-  const uniqueMap = new Map();
   const tz = SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone();
+
+  // COMPREHENSIVE VALIDATION
+  const validationIssues = [];
+  const invalidRecords = [];
+
+  for (let i = 1; i < data.length; i++) {
+    const validation = validateArchiveRecord(data[i], headers, i + 1, tz);
+    if (!validation.isValid) {
+      invalidRecords.push(validation);
+      validationIssues.push(`Row ${validation.rowIndex} [${validation.taskName || "NO TASK"}]: ${validation.issues.join("; ")}`);
+    }
+  }
+
+  // Alert user if validation issues found (INFORMATIONAL ONLY - NO DELETION)
+  let alertMsg = "";
+  if (invalidRecords.length > 0) {
+    const summary = `⚠️ DATA INTEGRITY ALERT: Found ${invalidRecords.length} record(s) with validation issues in TaskArchive.\n\nPLEASE REVIEW:\n\n${validationIssues.slice(0, 10).join("\n")}`;
+    const fullMsg = validationIssues.length > 10 ? summary + `\n\n...and ${validationIssues.length - 10} more issues.` : summary;
+
+    alertMsg = `🔍 Validation: ${invalidRecords.length} issue(s) found (records preserved).\n`;
+
+    SpreadsheetApp.getUi().alert(
+      "Archive Data Integrity Alert",
+      fullMsg + "\n\nNOTE: Records have been preserved. Please review and fix manually if needed.",
+      SpreadsheetApp.getUi().ButtonSet.OK
+    );
+  }
+
+  const uniqueMap = new Map();
 
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
@@ -177,27 +313,32 @@ function pruneArchiveDuplicatesSafe(sheet) {
         }
     }
 
-    // Deduplication Key
+    // Deduplication Key (Task + CompletionDate)
     const key = taskName + "|" + completionStr;
 
-    const currentSyncTime = row[0] instanceof Date ? row[0].getTime() : new Date(row[0]).getTime(); // Handle SyncDate
-
-    // Filter: Must have completion date
-    const hasCompletionDate = completionStr !== "";
+    const currentSyncTime = row[0] instanceof Date ? row[0].getTime() : new Date(row[0]).getTime();
 
     // Keep if new, or if this row has a newer Sync Date than what we have stored
-    if (hasCompletionDate && (!uniqueMap.has(key) || currentSyncTime > uniqueMap.get(key).time)) {
+    if (!uniqueMap.has(key) || currentSyncTime > uniqueMap.get(key).time) {
       uniqueMap.set(key, { time: currentSyncTime || 0, data: row });
     }
   }
 
   const finalRows = [headers, ...Array.from(uniqueMap.values()).map(item => item.data)];
 
-  // Write back unique data
+  // Write back deduplicated data
   sheet.clearContents();
   sheet.getRange(1, 1, finalRows.length, headers.length).setValues(finalRows);
 
-  return `Sync Complete. ${finalRows.length - 1} records maintained.`;
+  const dedupCount = data.length - 1 - (finalRows.length - 1);
+
+  let statusMsg = alertMsg;
+  if (dedupCount > 0) {
+    statusMsg += `📋 Deduplication: ${dedupCount} duplicate(s) removed.\n`;
+  }
+  statusMsg += `✅ Sync Complete. ${finalRows.length - 1} records maintained.`;
+
+  return statusMsg;
 }
 
 /**
