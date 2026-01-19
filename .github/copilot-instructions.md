@@ -211,51 +211,72 @@ Each commit message consists of a **header**, a **body**, and a **footer**. The 
 
 ## Atomic Commits
 
-**CRITICAL**: Always break unstaged changes into atomic, focused commits. This is MANDATORY, not optional.
+**CRITICAL**: Always create focused, atomic commits. This is MANDATORY, not optional.
+
+### Working with AI Assistant - Atomic Commit Strategy
+
+Since interactive hunk staging (`git add -p`) requires manual user input and isn't practical with AI assistance, follow this workflow:
+
+1. **One logical change per session** - Complete one feature/fix, then commit before starting another
+2. **Commit before switching topics** - When unstaged changes exist and a new unrelated request comes in, **STOP and suggest committing first**
+3. **Organize by files when possible** - Group changes so related files can be staged together
+
+### When to Suggest Committing First
+
+**CRITICAL**: If the user requests a new feature/change that is unrelated to current unstaged changes, respond with:
+
+```
+"Before we proceed, I notice we have uncommitted changes for [describe current changes].
+Should we commit these first to keep our commits atomic? I can help create an appropriate commit message."
+```
+
+**Examples of when to suggest committing:**
+- Current changes: UI styling → New request: Server-side logic
+- Current changes: Feature implementation → New request: Bug fix
+- Current changes: Analytics feature A → New request: Analytics feature B (different functionality)
+- Current changes: Configuration updates → New request: New feature
+
+**When to proceed without committing:**
+- The new request is a direct continuation/completion of current work
+- The new request fixes/improves what was just implemented
+- The new request adjusts parameters/defaults of the current feature
 
 ### When to Create Separate Commits
 
 1. **Different features** - Each new feature should be its own commit
-2. **Different files with different purposes** - UI changes vs server logic vs configuration
-3. **Within the same file** - Use `git add -p` to stage specific hunks that belong to different logical changes
-4. **Bug fixes vs features** - Never mix bug fixes with new features
-5. **Refactoring vs functionality** - Keep refactoring separate from functional changes
+2. **Different subsystems** - UI changes vs server logic vs configuration
+3. **Bug fixes vs features** - Never mix bug fixes with new features
+4. **Refactoring vs functionality** - Keep refactoring separate from functional changes
+5. **Different aspects of same feature** - If a feature has distinct parts (e.g., calculation logic, UI controls, data retrieval), consider separate commits
 
-### How to Stage Hunks
+### Commit Workflow
 
-Use `git add -p <file>` (or `git add --patch <file>`) to interactively stage specific changes:
-- Press `y` to stage a hunk
-- Press `n` to skip a hunk
-- Press `s` to split a hunk into smaller pieces
-- Press `e` to manually edit a hunk
+1. **Check for uncommitted changes**: `git status`
+2. **Review changes**: `git diff`
+3. **Stage related files**: `git add file1.js file2.js`
+4. **Commit with focused message**: `git commit -m "type(scope): description"`
+5. **Repeat for next logical group** (if multiple unrelated changes exist)
 
 ### Examples of Proper Atomic Commits
 
-**GOOD - Separate commits:**
+**GOOD - Separate commits in separate sessions:**
 ```
-Commit 1: feat(analytics): add moving average calculation to time trend
-Commit 2: feat(analytics): add weekend-only filter for moving average
-Commit 3: feat(analytics): add days-ahead projection for future tasks
-Commit 4: style(analytics): change default MA window to 28 days
-```
-
-**BAD - One large commit:**
-```
-Commit 1: feat(analytics): add moving average, weekend filter, projections, and UI changes
+Session 1: feat(analytics): add moving average calculation to time trend
+Session 2: feat(analytics): add weekend-only filter for moving average
+Session 3: feat(analytics): add days-ahead projection for future tasks
+Session 4: style(analytics): change default MA window to 28 days
 ```
 
-### Workflow for Multiple Changes
-
-1. Review all unstaged changes: `git status` and `git diff`
-2. Identify logical groupings of changes
-3. For each logical group:
-   - Stage only those changes: `git add -p <files>`
-   - Commit with focused message: `git commit -m "type(scope): description"`
-4. Repeat until all changes are committed
+**BAD - One large commit mixing multiple features:**
+```
+feat(analytics): add moving average, weekend filter, projections, and change defaults
+```
 
 ### Rule of Thumb
 
-If your commit message needs "and" or multiple bullet points covering different topics, you should split it into multiple commits.
+- If your commit message needs "and" or has multiple bullet points for different features, the commit should be split
+- Each commit should tell one clear story
+- If you can't describe the commit in one sentence without "and", it's too large
 
 ## Header
 
