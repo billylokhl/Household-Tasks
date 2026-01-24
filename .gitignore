@@ -1,2 +1,4 @@
 old
 new
+node_modules/
+coverage/

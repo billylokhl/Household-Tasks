@@ -1,7 +1,7 @@
 # Testing Guide
 
-**Last Updated**: January 24, 2026  
-**Test Count**: 28 tests across 3 suites  
+**Last Updated**: January 24, 2026
+**Test Count**: 28 tests across 3 suites
 **Status**: ✅ All Passing
 
 This document provides comprehensive guidance for testing the Household Task Management System.
@@ -154,7 +154,7 @@ Mock implementations of:
   - Valid strings → parsed Date
   - Invalid strings → null
   - Multiple date formats
-  
+
 - `parseTimeValue()` - 8 test cases
   - Empty values → 0
   - Numbers → minutes
@@ -274,10 +274,10 @@ describe('MyModule Integration Tests', () => {
    ```javascript
    // Arrange
    const input = 'test';
-   
+
    // Act
    const result = myFunction(input);
-   
+
    // Assert
    expect(result).toBe(expectedValue);
    ```
@@ -352,7 +352,7 @@ For integration tests, create realistic test data:
 const testData = [
   // Header row
   ['Task', 'Category', 'Importance', 'ECT', 'PriorityScore', 'DueDate'],
-  
+
   // Data rows
   ['Clean kitchen', 'Household', 'High', '30m', 85, new Date('2026-01-24')],
   ['Buy groceries', 'Personal', 'Normal', '1h', 70, new Date('2026-01-25')],
@@ -419,7 +419,7 @@ FAIL tests/unit/utilities.test.js
   Utilities
     safeParseDate
       ✕ should parse valid date strings
-      
+
     expect(received).toBe(expected)
     Expected: 24
     Received: 23
@@ -581,7 +581,7 @@ npm install
 
 **Symptom**: Different results in different environments
 
-**Solution**: 
+**Solution**:
 - Check Node version consistency
 - Ensure timezone-independent date handling
 - Use deterministic test data (no `Date.now()`)
@@ -637,6 +637,6 @@ For questions or issues with testing:
 
 ---
 
-**Document Status**: 🟢 Current  
-**Next Review**: When new tests are added  
+**Document Status**: 🟢 Current
+**Next Review**: When new tests are added
 **Maintained By**: Development Team
