@@ -37,6 +37,10 @@
         <input type="checkbox" id="weekendOnly" checked onchange="refreshData()" style="margin-right: 5px; cursor: pointer;" />
         Weekend Only
       </label>
+      <label style="font-size: 14px; margin-left: 15px; display: flex; align-items: center; cursor: pointer;">
+        <input type="checkbox" id="showMA" checked onchange="drawChart()" style="margin-right: 5px; cursor: pointer;" />
+        Show MA
+      </label>
       <label style="font-size: 14px; margin-left: 15px; margin-right: 5px;">Days to Look Ahead:</label>
       <input type="number" id="daysAhead" value="7" min="0" max="30" style="width: 60px; padding: 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--text);" onchange="refreshData()" />
     </div>
@@ -203,7 +207,28 @@
       const detailsSet = currentOwner === 'A' ? allRes.detailsA : allRes.detailsB;
       const categories = currentOwner === 'A' ? allRes.catsA : allRes.catsB;
 
-      const data = google.visualization.arrayToDataTable(dataSet);
+      // Check if MA should be shown
+      const showMA = document.getElementById('showMA').checked;
+
+      // Clone and filter dataset based on MA toggle
+      let filteredDataSet = dataSet.map((row, idx) => {
+        if (idx === 0) {
+          // Header row - remove MA columns if MA is disabled
+          if (!showMA) {
+            // Remove last 1 column (MA value)
+            return row.slice(0, -1);
+          }
+          return row;
+        } else {
+          // Data rows - remove MA values if MA is disabled
+          if (!showMA) {
+            return row.slice(0, -1);
+          }
+          return row;
+        }
+      });
+
+      const data = google.visualization.arrayToDataTable(filteredDataSet);
       const textColor = isDarkMode ? '#cbd5e1' : '#334155';
       const majorColor = isDarkMode ? '#94a3b8' : '#64748b'; // Thick/Dark for labeled
       const minorColor = isDarkMode ? '#1e293b' : '#e2e8f0'; // Thin/Light for unlabeled
@@ -216,8 +241,10 @@
       for (let i = 0; i < numCategories; i++) {
         seriesConfig[i] = { type: 'bars' };
       }
-      // Last series is the moving average line
-      seriesConfig[numCategories] = { type: 'line', lineWidth: 3, pointSize: 0, color: '#f59e0b', lineDashStyle: [4, 4] };
+      // Last series is the moving average line (only if MA is enabled)
+      if (showMA) {
+        seriesConfig[numCategories] = { type: 'line', lineWidth: 3, pointSize: 0, color: '#f59e0b', lineDashStyle: [4, 4] };
+      }
 
       const options = {
         seriesType: 'bars',
