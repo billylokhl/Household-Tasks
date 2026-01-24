@@ -428,6 +428,8 @@ function performPrioritizationCleanup(priSheet, archiveSheet, tz) {
   const priCompletionIdx = findPriIdx("completiondate");
   const priRecurrenceIdx = priHeaders.findIndex(h => String(h).toLowerCase() === "recurrence");
   const priIncidentIdx = priHeaders.findIndex(h => String(h).toLowerCase() === "incidentdate");
+  const priIncidentOwnerIdx = priHeaders.findIndex(h => String(h).toLowerCase() === "incidentowner");
+  const priIncidentDetailsIdx = priHeaders.findIndex(h => String(h).toLowerCase() === "incidentdetails");
   const priCompletionCatIdx = findPriIdx("completiondate🐱");
   const priCompletionPigIdx = findPriIdx("completiondate🐷");
 
@@ -468,6 +470,17 @@ function performPrioritizationCleanup(priSheet, archiveSheet, tz) {
     const incidentVal = priIncidentIdx !== -1 ? priData[r][priIncidentIdx] : "";
     const hasIncident = incidentVal && String(incidentVal).trim() !== "";
 
+    // Clear incident fields after task is logged to archive
+    if (priIncidentIdx !== -1) {
+      cellsToClear.push(priSheet.getRange(rowIndex, priIncidentIdx + 1).getA1Notation());
+    }
+    if (priIncidentOwnerIdx !== -1) {
+      cellsToClear.push(priSheet.getRange(rowIndex, priIncidentOwnerIdx + 1).getA1Notation());
+    }
+    if (priIncidentDetailsIdx !== -1) {
+      cellsToClear.push(priSheet.getRange(rowIndex, priIncidentDetailsIdx + 1).getA1Notation());
+    }
+
     if (isRecurring) {
       // Recurring: Clear completion dates (col index is 0-based, need to add 1 for column number)
       if (priCompletionCatIdx !== -1) {
@@ -480,7 +493,7 @@ function performPrioritizationCleanup(priSheet, archiveSheet, tz) {
       // Non-recurring without incident: Delete
       rowsToDelete.push(rowIndex);
     }
-    // Non-recurring with incident: Preserve
+    // Non-recurring with incident: Preserve row but incident fields already cleared above
   }
 
   // Batch clear cells
