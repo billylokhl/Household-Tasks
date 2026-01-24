@@ -146,7 +146,7 @@ function renderTable(data) {
           </td>
           <td>${t.score}</td>
           <td>${t.cat}</td>
-          <td><input type="checkbox" onchange="calc(this,${t.ectMins})"></td>
+          <td><input type="checkbox" data-ectmins="${t.ectMins}" onchange="calc(this,${t.ectMins})"></td>
         `;
         tbody.appendChild(row);
       });
@@ -167,6 +167,40 @@ function renderTable(data) {
                const scoreCell = row.cells[5];
                scoreCell.innerText = res.newScore;
             }
+
+            // If DueDate was updated, update the data-sort attribute for correct sorting
+            if (field === 'due') {
+               const row = el.closest('tr');
+               const dueCell = row.cells[0];
+               const newDate = new Date(el.value);
+               if (!isNaN(newDate.getTime())) {
+                  // Calculate sort value: days from epoch
+                  const sortValue = Math.floor(newDate.getTime() / (1000 * 60 * 60 * 24));
+                  dueCell.dataset.sort = sortValue;
+               }
+            }
+
+            // If ECT was updated, recalculate the checkbox handler
+            if (field === 'ect') {
+               const row = el.closest('tr');
+               const checkbox = row.cells[7].querySelector('input[type="checkbox"]');
+               const newMins = parseEctToMinutes(el.value);
+               const wasChecked = checkbox.checked;
+
+               // Update the checkbox handler with new minutes
+               checkbox.onchange = function() { calc(this, newMins); };
+
+               // If checkbox is checked, update the total with the difference
+               if (wasChecked) {
+                  const oldMins = parseInt(checkbox.dataset.ectmins || 0);
+                  let total = parseInt(document.getElementById('totalDisplay').innerText);
+                  total = total - oldMins + newMins;
+                  document.getElementById('totalDisplay').innerText = total;
+               }
+
+               // Store the new minutes in the checkbox for future reference
+               checkbox.dataset.ectmins = newMins;
+            }
          })
          .withFailureHandler((err) => {
             el.style.backgroundColor = '#f8d7da'; // Red highlight on error
@@ -174,6 +208,17 @@ function renderTable(data) {
             console.error(err);
          })
          .updatePlannerTask(rowId, field, el.value);
+    }
+
+    function parseEctToMinutes(val) {
+       if (!val || val === '') return 0;
+       val = String(val).toLowerCase().trim();
+       const num = parseFloat(val);
+       if (isNaN(num)) return 0;
+
+       if (val.includes('day')) return num * 480;
+       if (val.includes('h')) return num * 60;
+       return num; // Default to minutes
     }
 
     // Calculation and Filtering logic remains the same
@@ -227,7 +272,18 @@ function renderTable(data) {
           var x = rows[i].cells[n], y = rows[i + 1].cells[n];
 
           let getVal = (cell) => {
-             if (n === 0) return parseFloat(cell.dataset.sort);
+             if (n === 0) {
+                // For due date column, read current input value and convert to sortable number
+                let input = cell.querySelector('input[type="date"]');
+                if (input && input.value) {
+                   let date = new Date(input.value);
+                   if (!isNaN(date.getTime())) {
+                      return Math.floor(date.getTime() / (1000 * 60 * 60 * 24));
+                   }
+                }
+                // Fallback to data-sort if input is empty or invalid
+                return parseFloat(cell.dataset.sort) || 0;
+             }
              let input = cell.querySelector('input');
              let txt = input ? input.value : cell.innerText;
              return isNaN(parseFloat(txt)) || txt === "" ? txt.toLowerCase() : parseFloat(txt);
