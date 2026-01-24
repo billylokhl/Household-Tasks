@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: #1e293b;
+      color: #f1f5f9;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 100%;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-size: 24px;
+      margin-bottom: 10px;
+      color: #f1f5f9;
+      border-bottom: 2px solid #334155;
+      padding-bottom: 10px;
+    }
+
+    .description {
+      margin-bottom: 20px;
+      padding: 12px;
+      background: #334155;
+      border-radius: 6px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .controls {
+      margin-bottom: 20px;
+      display: flex;
+      gap: 10px;
+    }
+
+    button {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: #3b82f6;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #2563eb;
+    }
+
+    .btn-primary:active {
+      transform: scale(0.98);
+    }
+
+    .loading {
+      text-align: center;
+      padding: 20px;
+      font-size: 16px;
+      color: #94a3b8;
+    }
+
+    .table-container {
+      overflow-x: auto;
+      background: #334155;
+      border-radius: 8px;
+      margin-top: 20px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    th {
+      background: #1e293b;
+      color: #f1f5f9;
+      font-weight: 600;
+      text-align: left;
+      padding: 12px;
+      position: sticky;
+      top: 0;
+      border-bottom: 2px solid #475569;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    th:hover {
+      background: #334155;
+    }
+
+    th::after {
+      content: ' ⇅';
+      opacity: 0.3;
+      font-size: 10px;
+    }
+
+    th.sort-asc::after {
+      content: ' ↑';
+      opacity: 1;
+      color: #3b82f6;
+    }
+
+    th.sort-desc::after {
+      content: ' ↓';
+      opacity: 1;
+      color: #3b82f6;
+    }
+
+    td {
+      padding: 10px 12px;
+      border-bottom: 1px solid #475569;
+    }
+
+    tr:hover {
+      background: #475569;
+    }
+
+    .no-data {
+      text-align: center;
+      padding: 40px;
+      color: #94a3b8;
+      font-size: 16px;
+    }
+
+    .count {
+      display: inline-block;
+      background: #dc2626;
+      color: white;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 700;
+      margin-left: 10px;
+    }
+
+    .logs {
+      margin-top: 20px;
+      padding: 12px;
+      background: #0f172a;
+      border-radius: 6px;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      color: #94a3b8;
+      max-height: 150px;
+      overflow-y: auto;
+    }
+
+    .log-line {
+      margin-bottom: 4px;
+    }
+
+    .weekend-highlight {
+      color: #f59e0b;
+      font-weight: 600;
+    }
+
+    .row-number {
+      color: #94a3b8;
+      font-size: 11px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>
+      Weekday Recurring Tasks Report
+      <span id="count" class="count" style="display: none;">0</span>
+    </h1>
+
+    <div class="description">
+      This tool identifies recurring tasks with a recurrence of <strong>1 week or longer</strong>
+      that have their DueDate falling on a <strong>weekday (Monday-Friday)</strong>.
+      These tasks might be better scheduled for weekends to improve work-life balance.
+      <br><br>
+      <strong>💡 Whitelist:</strong> To exclude a task from this report, add a checkbox column named <code>WeekdayOK</code>
+      to your Prioritization sheet and check it for tasks that are expected to fall on weekdays.
+    </div>
+
+    <div class="controls">
+      <button class="btn-primary" onclick="loadData()">🔍 Scan Tasks</button>
+    </div>
+
+    <div id="loading" class="loading" style="display: none;">
+      Scanning tasks...
+    </div>
+
+    <div id="results" style="display: none;">
+      <div class="table-container">
+        <table id="taskTable">
+          <thead>
+            <tr>
+              <th data-sort="rowNumber" data-type="number">Row</th>
+              <th data-sort="task" data-type="string">Task</th>
+              <th data-sort="category" data-type="string">Category</th>
+              <th data-sort="dueDate" data-type="string">Due Date</th>
+              <th data-sort="dayOfWeek" data-type="string">Day</th>
+              <th data-sort="recurrence" data-type="string">Recurrence</th>
+              <th data-sort="recurrenceDays" data-type="number">Recurs Every</th>
+              <th data-sort="owner" data-type="string">Owner</th>
+            </tr>
+          </thead>
+          <tbody id="taskTableBody">
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="noData" class="no-data" style="display: none;">
+      ✅ No recurring tasks with weekly+ recurrence found on weekdays!
+    </div>
+
+    <div id="logs" class="logs" style="display: none;"></div>
+  </div>
+
+  <script>
+    let tasksData = [];
+    let sortColumn = null;
+    let sortDirection = 'asc';
+
+    function loadData() {
+      document.getElementById('loading').style.display = 'block';
+      document.getElementById('results').style.display = 'none';
+      document.getElementById('noData').style.display = 'none';
+      document.getElementById('logs').style.display = 'none';
+
+      google.script.run
+        .withSuccessHandler(onDataLoaded)
+        .withFailureHandler(onError)
+        .getWeekdayRecurringTasks();
+    }
+
+    function onDataLoaded(data) {
+      document.getElementById('loading').style.display = 'none';
+
+      // Show logs
+      if (data.logs && data.logs.length > 0) {
+        const logsDiv = document.getElementById('logs');
+        logsDiv.innerHTML = data.logs.map(log => `<div class="log-line">${escapeHtml(log)}</div>`).join('');
+        logsDiv.style.display = 'block';
+      }
+
+      if (data.error) {
+        alert('Error: ' + data.error);
+        return;
+      }
+
+      const tasks = data.flaggedTasks || [];
+      tasksData = tasks;
+
+      if (tasks.length === 0) {
+        document.getElementById('noData').style.display = 'block';
+        document.getElementById('count').style.display = 'none';
+        return;
+      }
+
+      // Update count
+      const countEl = document.getElementById('count');
+      countEl.textContent = tasks.length;
+      countEl.style.display = 'inline-block';
+
+      // Render table and setup sorting
+      renderTable(tasksData);
+      setupSorting();
+      document.getElementById('results').style.display = 'block';
+    }
+
+    function renderTable(tasks) {
+      const tbody = document.getElementById('taskTableBody');
+      tbody.innerHTML = '';
+
+      tasks.forEach(task => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td class="row-number">${task.rowNumber}</td>
+          <td><strong>${escapeHtml(task.task)}</strong></td>
+          <td>${escapeHtml(task.category)}</td>
+          <td>${escapeHtml(task.dueDate)}</td>
+          <td class="weekend-highlight">${escapeHtml(task.dayOfWeek)}</td>
+          <td>${escapeHtml(task.recurrence)}</td>
+          <td>${task.recurrenceDays} days</td>
+          <td>${task.owner}</td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    function setupSorting() {
+      const headers = document.querySelectorAll('#taskTable th[data-sort]');
+      headers.forEach(header => {
+        header.addEventListener('click', function() {
+          const column = this.getAttribute('data-sort');
+          const type = this.getAttribute('data-type');
+
+          // Toggle direction if same column, else default to asc
+          if (sortColumn === column) {
+            sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+          } else {
+            sortColumn = column;
+            sortDirection = 'asc';
+          }
+
+          // Update header classes
+          headers.forEach(h => h.className = '');
+          this.className = 'sort-' + sortDirection;
+
+          // Sort and render
+          sortTable(column, type, sortDirection);
+        });
+      });
+    }
+
+    function sortTable(column, type, direction) {
+      const sorted = [...tasksData].sort((a, b) => {
+        let aVal = a[column];
+        let bVal = b[column];
+
+        // Handle different data types
+        if (type === 'number') {
+          aVal = parseFloat(aVal) || 0;
+          bVal = parseFloat(bVal) || 0;
+        } else {
+          aVal = String(aVal).toLowerCase();
+          bVal = String(bVal).toLowerCase();
+        }
+
+        if (aVal < bVal) return direction === 'asc' ? -1 : 1;
+        if (aVal > bVal) return direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+
+      renderTable(sorted);
+    }
+
+    function onError(error) {
+      document.getElementById('loading').style.display = 'none';
+      alert('Error loading data: ' + error.message);
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // Auto-load on open
+    window.addEventListener('load', function() {
+      loadData();
+    });
+  </script>
+</body>
+</html>

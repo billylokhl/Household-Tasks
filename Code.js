@@ -19,6 +19,7 @@ function onOpen() {
     .addSeparator()
     .addItem('View Incident Trend', 'showIncidentTrendModal')
     .addItem('View Task Time Trend', 'showTimeTrendModal')
+    .addItem('Weekday Recurring Tasks', 'showWeekdayRecurringTasksModal')
     .addSeparator()
     .addItem('Sync Task Database', 'runUnifiedSync')
     .addItem('Daily Cleanup', 'runDailyCleanup')
