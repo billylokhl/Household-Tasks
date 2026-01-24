@@ -291,6 +291,98 @@ function getTimeSpentData(maWindow, weekendOnly, daysAhead) {
 
     log(`Stats: Total Rows=${data.length}, Valid Dates=${validDateCount}, Inside 30-Day Window=${inRangeCount}`);
 
+    // 3.5. Add TODAY's incomplete tasks from Prioritization Sheet
+    const todayDate = new Date();
+    todayDate.setHours(0, 0, 0, 0);
+    const todayLabel = Utilities.formatDate(todayDate, tz, "MM/dd (E)");
+
+    if (timelineData.Billy[todayLabel]) {
+      const prioritization = ss.getSheetByName(CONFIG.SHEET.PRIORITIZATION);
+      if (prioritization) {
+        const prioData = prioritization.getDataRange().getValues();
+        const prioHeaders = prioData[0];
+
+        const prioGetIdx = (t) => {
+          const search = normalize(t);
+          return prioHeaders.findIndex(hdr => normalize(hdr).includes(search));
+        };
+
+        const prioTaskIdx = prioGetIdx("Task");
+        const prioCatIdx = prioGetIdx("Category");
+        const prioEctIdx = prioGetIdx("ECT");
+        const prioDueDateIdx = prioGetIdx("DueDate");
+        const prioCompBillyIdx = prioGetIdx("CompletionDate🐷");
+        const prioCompKarenIdx = prioGetIdx("CompletionDate🐱");
+
+        let prioBillyIdx = prioGetIdx("OwnershipBilly");
+        if (prioBillyIdx === -1) prioBillyIdx = prioGetIdx("Ownership🐷");
+        if (prioBillyIdx === -1) prioBillyIdx = prioGetIdx("Billy");
+        if (prioBillyIdx === -1) prioBillyIdx = prioGetIdx("🐷");
+
+        let prioKarenIdx = prioGetIdx("OwnershipKaren");
+        if (prioKarenIdx === -1) prioKarenIdx = prioGetIdx("Ownership🐱");
+        if (prioKarenIdx === -1) prioKarenIdx = prioGetIdx("Karen");
+        if (prioKarenIdx === -1) prioKarenIdx = prioGetIdx("🐱");
+
+        log(`Adding TODAY's incomplete tasks from Prioritization -> Task:${prioTaskIdx}, Cat:${prioCatIdx}, ECT:${prioEctIdx}, DueDate:${prioDueDateIdx}, Billy:${prioBillyIdx}, Karen:${prioKarenIdx}`);
+
+        let todayIncompleteCount = 0;
+
+        for (let i = 1; i < prioData.length; i++) {
+          const row = prioData[i];
+          let dueDate = row[prioDueDateIdx];
+
+          if (typeof dueDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dueDate)) {
+            dueDate = Utilities.parseDate(dueDate, tz, "yyyy-MM-dd");
+          } else {
+            dueDate = safeParseDate(dueDate);
+          }
+
+          // Check if due date is today
+          if (!dueDate || dueDate.getTime() !== todayDate.getTime()) continue;
+
+          const bRaw = row[prioBillyIdx];
+          const kRaw = row[prioKarenIdx];
+          const isBilly = (bRaw === true || String(bRaw).toUpperCase().includes("TRUE") || String(bRaw).includes("🐷") || String(bRaw).toLowerCase() === "yes");
+          const isKaren = (kRaw === true || String(kRaw).toUpperCase().includes("TRUE") || String(kRaw).includes("🐱") || String(kRaw).toLowerCase() === "yes");
+
+          // Check if task is NOT completed (completion date is empty)
+          const billyCompleted = row[prioCompBillyIdx] && String(row[prioCompBillyIdx]).trim() !== "";
+          const karenCompleted = row[prioCompKarenIdx] && String(row[prioCompKarenIdx]).trim() !== "";
+
+          const mins = parseTimeValue(row[prioEctIdx]);
+          const rawCat = String(row[prioCatIdx] || "Uncategorized").trim();
+          const taskName = String(row[prioTaskIdx] || "Unknown Task");
+          let displayCat = topCats.includes(rawCat) ? rawCat : "Other";
+
+          if (mins > 0) {
+            // Add incomplete Billy tasks
+            if (isBilly && !billyCompleted) {
+              timelineData.Billy[todayLabel][displayCat] += mins;
+              timelineData.Billy[todayLabel].total += mins;
+              timelineData.Billy[todayLabel].catBreakdown[rawCat] = (timelineData.Billy[todayLabel].catBreakdown[rawCat] || 0) + mins;
+              if (!timelineData.Billy[todayLabel].taskDetails[displayCat]) timelineData.Billy[todayLabel].taskDetails[displayCat] = [];
+              timelineData.Billy[todayLabel].taskDetails[displayCat].push({ task: taskName, mins: mins });
+              todayIncompleteCount++;
+            }
+            // Add incomplete Karen tasks
+            if (isKaren && !karenCompleted) {
+              timelineData.Karen[todayLabel][displayCat] += mins;
+              timelineData.Karen[todayLabel].total += mins;
+              timelineData.Karen[todayLabel].catBreakdown[rawCat] = (timelineData.Karen[todayLabel].catBreakdown[rawCat] || 0) + mins;
+              if (!timelineData.Karen[todayLabel].taskDetails[displayCat]) timelineData.Karen[todayLabel].taskDetails[displayCat] = [];
+              timelineData.Karen[todayLabel].taskDetails[displayCat].push({ task: taskName, mins: mins });
+              todayIncompleteCount++;
+            }
+          }
+        }
+
+        log(`Added ${todayIncompleteCount} incomplete tasks for TODAY (${todayLabel})`);
+      } else {
+        log("WARNING: Prioritization sheet not found, skipping today's incomplete tasks");
+      }
+    }
+
     // 4. Populate Future Days from Prioritization Sheet
     if (daysAhead > 0) {
       const prioritization = ss.getSheetByName(CONFIG.SHEET.PRIORITIZATION);
