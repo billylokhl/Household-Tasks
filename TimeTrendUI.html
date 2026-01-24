@@ -263,9 +263,10 @@
 
     function showTaskDetails(date, category, details, color) {
         const container = document.getElementById('task_details_container');
-        // Strip the today marker (▶) if present
+        // Use the original date (with triangle if present) to look up details
+        const dayData = details[date];
+        // Strip the today marker (▶) only for display
         const cleanDate = date.replace(/^▶\s*/, '');
-        const dayData = details[cleanDate];
         const tasks = (dayData && dayData[category]) ? dayData[category] : [];
 
         let html = `<div style="font-weight: bold; margin-bottom: 8px;"><span style="background-color: ${color}; color: white; padding: 4px 8px; border-radius: 4px;">${category}</span> ${cleanDate}</div>`;
