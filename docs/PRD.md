@@ -971,7 +971,7 @@ Located in Google Sheets menu bar after running `onOpen()`.
 - Plan upcoming weeks based on projected time
 
 **Implementation Details**:
-- **Data Source**: 
+- **Data Source**:
   - Historical: TaskArchive (CompletionDate + ECT + Category + Owner)
   - Today's Incomplete: Prioritization (DueDate = today, CompletionDate empty)
 - **Date Range**: Last 30 days + 0-14 days ahead
@@ -980,7 +980,7 @@ Located in Google Sheets menu bar after running `onOpen()`.
 - **MA Window**: 1-30 days (default 28)
 - **Weekend Detection**: Saturday + Sunday only for MA calculation
 - **Tooltips**: HTML table with per-category breakdown
-- **Data Consistency**: 
+- **Data Consistency**:
   - Details object keys include date labels WITH triangle marker
   - UI lookup must use original date (with ▶), strip marker only for display text
   - Prevents lookup mismatches when clicking chart bars
