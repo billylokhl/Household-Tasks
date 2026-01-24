@@ -232,7 +232,6 @@ function getTimeSpentData(maWindow, weekendOnly, daysAhead) {
 
       timelineLabels.forEach((lb, idx) => {
         const dayData = timelineData[p][lb];
-        details[lb] = dayData.taskDetails;
 
         if (dayData.total > 0) hasData = true;
 
@@ -247,6 +246,9 @@ function getTimeSpentData(maWindow, weekendOnly, daysAhead) {
         if (idx === todayIndex) {
           dateLabel = `▶ ${lb}`; // Add triangle marker before today's date
         }
+
+        // Store details with the modified dateLabel so lookups work correctly
+        details[dateLabel] = dayData.taskDetails;
 
         let row = [dateLabel];
         const isFuture = dayData.isFuture;
