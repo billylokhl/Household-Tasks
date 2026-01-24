@@ -198,13 +198,34 @@ const CONFIG = {
 
 ---
 
-# Git Commit Instructions
+# Git Commit Best Practices
 
-When generating git commit messages, follow the **Conventional Commits** specification. This provides a consistent and readable history for the project.
+When working with Git, follow these software engineering best practices to maintain a clean, readable, and useful commit history.
 
-## Commit Message Format
+## Core Principles
 
-Each commit message consists of a **header**, a **body**, and a **footer**. The header has a special format that includes a **type**, a **scope**, and a **subject**:
+### 1. **Commit Early, Commit Often**
+- Make small, frequent commits rather than large, infrequent ones
+- Each commit should represent a logical unit of work
+- Easier to review, revert, and understand changes
+
+### 2. **Atomic Commits**
+- One commit = one logical change
+- If a commit is reverted, it shouldn't break unrelated functionality
+- Helps with bisecting, cherry-picking, and code review
+
+### 3. **Write for Others (and Future You)**
+- Commit messages are permanent documentation
+- Explain the "why", not just the "what"
+- Assume readers have context about the codebase but not about your specific decisions
+
+---
+
+## Conventional Commits Specification
+
+Follow the **Conventional Commits** standard for consistent, parseable commit messages.
+
+### Commit Message Format
 
 ```
 <type>(<scope>): <subject>
@@ -214,10 +235,15 @@ Each commit message consists of a **header**, a **body**, and a **footer**. The 
 <footer>
 ```
 
-## Line Length Rules
+### Line Length Rules
 
-- The **header** line should ideally be **50 characters**, and must not exceed **72 characters**.
-- The **body** and **footer** lines should be wrapped at **72 characters**.
+- **Header**: Maximum 72 characters (ideally 50)
+- **Body**: Wrap at 72 characters
+- **Footer**: Wrap at 72 characters
+
+**Why these limits?**
+- 50 chars: Displays fully in GitHub UI, git log --oneline
+- 72 chars: Readable in terminal without wrapping
 
 ## Atomic Commits
 
@@ -292,62 +318,346 @@ feat(analytics): add moving average, weekend filter, projections, and change def
 
 The **header** is mandatory. The scope of the header is optional.
 
-### Type
+---
+
+## Commit Message Structure
+
+### Header (Required)
+
+**Format**: `<type>(<scope>): <subject>`
+
+#### Type (Required)
 
 Must be one of the following:
 
-- **feat**: A new feature
-- **fix**: A bug fix
-- **docs**: Documentation only changes
-- **style**: Changes that do not affect the meaning of the code (white-space, formatting, missing semi-colons, etc)
-- **refactor**: A code change that neither fixes a bug nor adds a feature
-- **perf**: A code change that improves performance
-- **test**: Adding missing tests or correcting existing tests
-- **build**: Changes that affect the build system or external dependencies (example scopes: gulp, broccoli, npm)
-- **ci**: Changes to our CI configuration files and scripts (example scopes: Travis, Circle, BrowserStack, SauceLabs)
-- **chore**: Other changes that don't modify src or test files
-- **revert**: Reverts a previous commit
+| Type | Description | When to Use |
+|------|-------------|-------------|
+| **feat** | A new feature | Adding new functionality users can interact with |
+| **fix** | A bug fix | Fixing incorrect behavior |
+| **docs** | Documentation only | README, comments, doc files (no code changes) |
+| **style** | Code style changes | Formatting, whitespace, semicolons (no logic change) |
+| **refactor** | Code restructuring | Neither fixes bug nor adds feature, improves structure |
+| **perf** | Performance improvement | Makes code faster or more efficient |
+| **test** | Test changes | Adding or modifying tests |
+| **build** | Build system changes | Dependencies, build scripts, tooling |
+| **ci** | CI/CD changes | GitHub Actions, deployment scripts |
+| **chore** | Maintenance tasks | Configuration, tooling, no production code change |
+| **revert** | Revert previous commit | Reverting a specific commit |
 
-### Scope
+#### Scope (Optional but Recommended)
 
-The scope should be the name of the section of the codebase affected (e.g., `deps`, `ui`, `api`, `auth`).
+The scope indicates which part of the codebase is affected.
 
-### Subject
+**For this project, use:**
+- `sync` - SyncService, archive operations
+- `planner` - DayPlanner functionality
+- `analytics` - AnalyticsService, charts, trends
+- `backup` - BackupSystem operations
+- `ui` - HTML UI components
+- `config` - Configuration changes
+- `utils` - Utility functions
+- `menu` - Code.js menu system
+- `recurring` - RecurringTaskChecker
+- `deps` - Dependencies, external libraries
+- `docs` - Documentation files
 
-The subject contains a succinct description of the change:
+**Examples:**
+- `feat(planner): add weekend-only filter`
+- `fix(sync): prevent duplicate archive entries`
+- `docs(readme): update installation instructions`
 
-- Use the imperative, present tense: "change" not "changed" nor "changes".
-- Don't capitalize the first letter.
-- No dot (.) at the end.
+#### Subject (Required)
 
-## Body
+Succinct description of the change (max 50 chars for header total).
 
-The body should include the motivation for the change and contrast this with previous behavior.
+**Rules:**
+- Use imperative mood: "add" not "added" or "adds"
+- Don't capitalize first letter
+- No period at the end
+- Complete the sentence: "This commit will..."
 
-- Use the imperative, present tense.
-- Can consist of multiple paragraphs.
+**Good Examples:**
+- `add user authentication`
+- `fix null pointer in sync service`
+- `update moving average calculation`
+- `remove deprecated backup function`
 
-## Footer
+**Bad Examples:**
+- ❌ `Added user authentication` (past tense)
+- ❌ `Fix bug` (too vague)
+- ❌ `Updated the moving average calculation.` (capital + period)
+- ❌ `Add user auth and fix sync bug and update docs` (multiple changes)
 
-The footer should contain any information about **Breaking Changes** and is also the place to reference GitHub issues that this commit **Closes**.
+---
 
-- **Breaking Changes** should start with the word `BREAKING CHANGE:` with a space or two newlines. The rest of the commit message is then used for this.
+### Body (Optional but Encouraged)
+
+Explain the motivation and context for the change.
+
+**Include:**
+- **Why** the change was needed
+- **What** problem it solves
+- **How** it differs from previous behavior
+- Any side effects or implications
+
+**Format:**
+- Use imperative, present tense
+- Wrap at 72 characters
+- Separate paragraphs with blank lines
+- Use bullet points if helpful
+
+**Example:**
+```
+feat(analytics): add weekend-only moving average filter
+
+The previous moving average included all days, which made it
+difficult to analyze weekend workload patterns separately.
+
+Add a new toggle that calculates MA using only Saturday and
+Sunday data points. This helps identify if weekends are
+consistently overloaded.
+
+- Add weekendOnly parameter to getTimeSpentData()
+- Update TimeTrendUI.html with toggle control
+- Filter MA calculation to weekend days only when enabled
+```
+
+---
+
+### Footer (Optional)
+
+Reference issues, breaking changes, or related work.
+
+**Breaking Changes:**
+```
+BREAKING CHANGE: The config object structure has changed.
+Users must update their CONFIG.BACKUP.FOLDER_ID references.
+```
+
+**Issue References:**
+```
+Closes #42
+Fixes #123
+Related to #456
+```
+
+**Co-authors:**
+```
+Co-authored-by: Name <email@example.com>
+```
+
+---
 
 ## Examples
 
-**Feature commit:**
+### Simple Feature
 ```
-feat(auth): add login with google support
+feat(planner): add task commit checkbox
+
+Allow users to mark tasks as "committed" for the day.
+Shows total committed time at bottom of planner.
 ```
 
-**Bug fix:**
+### Bug Fix
 ```
-fix(api): handle null response in user service
+fix(sync): prevent duplicate archive entries
+
+The deduplication logic was comparing dates incorrectly,
+allowing duplicate task+date combinations.
+
+Update pruneArchiveDuplicatesSafe to use lowercase task
+names and normalized date format for comparison.
+
+Fixes #89
 ```
 
-**Breaking change:**
+### Refactoring
 ```
-feat(database): switch to new connection pool library
+refactor(utils): extract date parsing to separate function
 
-BREAKING CHANGE: The config object for database connection has changed structure.
+The safeParseDate logic was duplicated across multiple
+files. Extract to Utilities.js for reuse.
+
+No functional changes.
+```
+
+### Documentation
+```
+docs(prd): add future enhancements section
+
+Document planned Phase 2 and Phase 3 features including
+mobile app, AI insights, and multi-household support.
+```
+
+### Breaking Change
+```
+feat(config): centralize all constants in Configuration.js
+
+BREAKING CHANGE: BACKUP_FOLDER_ID moved from Code.js to
+CONFIG.BACKUP.FOLDER_ID. Update all references accordingly.
+
+Provides single source of truth for all configuration values.
+Reduces magic strings throughout codebase.
+```
+
+### Multiple Related Changes
+```
+feat(analytics): add configurable moving average window
+
+Add slider controls to adjust MA window from 1-30 days.
+Store user preference in localStorage.
+
+- Add maWindow parameter to getTimeSpentData()
+- Update TimeTrendUI.html with slider control
+- Add localStorage persistence for MA window setting
+- Update chart to reflect new MA calculations
+
+This allows users to smooth trends over different time
+periods based on their analysis needs.
+```
+
+---
+
+## Additional Best Practices
+
+### When to Commit
+
+**✅ Good Times to Commit:**
+- Feature is complete and tested
+- Bug fix is verified working
+- After refactoring that maintains functionality
+- Before switching to different task
+- At natural stopping points (end of day, break)
+
+**❌ Bad Times to Commit:**
+- Code doesn't compile/run
+- Tests are failing
+- Work is half-finished (unless explicitly WIP)
+- Before reviewing your own changes
+
+### Pre-Commit Checklist
+
+Before committing, ask yourself:
+
+1. ✅ Does the code work? (test it!)
+2. ✅ Are tests passing?
+3. ✅ Did I review my own changes? (`git diff`)
+4. ✅ Is this commit focused on one thing?
+5. ✅ Did I remove debug code/console.logs?
+6. ✅ Is my commit message clear and descriptive?
+7. ✅ Did I stage only the files related to this change?
+
+### Avoid These Common Mistakes
+
+1. **"Fix typo"** commits - Squash with the original commit if possible
+2. **"WIP"** commits in main branch - Use feature branches for WIP
+3. **Mixing formatting with logic changes** - Separate commits
+4. **Committing commented-out code** - Delete it (Git remembers)
+5. **Committing secrets/credentials** - Use environment variables
+6. **Vague messages** - "update stuff", "fix bug", "changes"
+
+### Git Commands Reference
+
+```bash
+# Check what's changed
+git status
+git diff
+git diff --staged
+
+# Stage changes
+git add file.js              # Stage specific file
+git add .                     # Stage all changes (use carefully!)
+git add -p                    # Interactive staging (review each chunk)
+
+# Commit
+git commit -m "feat(scope): message"                    # Simple commit
+git commit                                               # Opens editor for body
+git commit --amend                                       # Modify last commit
+git commit --amend --no-edit                            # Add to last commit, keep message
+
+# Review history
+git log
+git log --oneline
+git log --graph --oneline --all
+git show <commit-hash>
+
+# Undo changes
+git restore file.js                                     # Discard unstaged changes
+git restore --staged file.js                            # Unstage file
+git reset HEAD~1                                        # Undo last commit, keep changes
+git reset --hard HEAD~1                                 # Undo last commit, discard changes
+git revert <commit-hash>                                # Create new commit undoing a commit
+```
+
+---
+
+## Project-Specific Scopes
+
+For this Household Task Management System, use these scopes:
+
+| Scope | Files Affected | Example |
+|-------|----------------|---------|
+| `sync` | SyncService.js | `fix(sync): handle missing completion date` |
+| `planner` | DayPlanner.js, DayPlannerUI.html | `feat(planner): add overdue toggle` |
+| `analytics` | AnalyticsService.js | `perf(analytics): optimize date parsing` |
+| `ui` | Any .html file | `style(ui): update dark mode colors` |
+| `config` | Configuration.js | `feat(config): add timezone constant` |
+| `backup` | BackupSystem.js | `fix(backup): correct retention period` |
+| `utils` | Utilities.js | `refactor(utils): simplify time parsing` |
+| `menu` | Code.js (menu section) | `feat(menu): add recurring tasks menu item` |
+| `recurring` | RecurringTaskChecker.js | `feat(recurring): add whitelist support` |
+| `docs` | README, PRD, any .md | `docs(prd): update data model section` |
+
+---
+
+## Commit Message Templates
+
+### For AI Assistant Context
+
+When suggesting commits, use this format:
+
+```
+"I recommend committing these changes:
+
+git add [files]
+git commit -m "type(scope): description"
+
+This commit [explain what and why]. Would you like me to help
+create a more detailed commit message with a body?"
+```
+
+### Detailed Commit Template
+
+```
+<type>(<scope>): <subject line max 50 chars>
+
+<body: wrap at 72 chars>
+Explain the motivation for this change. What problem does it solve?
+How does it differ from previous behavior?
+
+<additional paragraphs if needed>
+
+<footer: references, breaking changes>
+Closes #123
+```
+
+---
+
+## When AI Should Suggest Committing
+
+**CRITICAL RULES:**
+
+1. **Before switching contexts** - If user requests unrelated work
+2. **After completing feature** - When logical unit is done
+3. **When files from different subsystems are staged** - Suggest splitting
+
+**Response Template:**
+```
+"Before we proceed, I notice uncommitted changes for [describe changes].
+Should we commit these first to keep commits atomic?
+
+Suggested commit:
+feat(scope): description
+
+This would capture [what was completed]."
 ```
