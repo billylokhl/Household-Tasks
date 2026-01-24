@@ -647,53 +647,60 @@ Before committing, ask yourself:
 
 ### Commit Message Formatting for Terminal Safety
 
-**CRITICAL**: When creating commit messages, especially multi-line messages with body text, use proper escaping to prevent terminal issues.
+**CRITICAL**: Avoid heredoc syntax (`cat > file << 'EOF'`) in automated terminal commands as it often causes the terminal to get stuck in heredoc mode, especially when run through tool automation.
 
-**Recommended Approaches**:
+**Recommended Approaches (in order of preference)**:
 
-1. **Use a Commit Message File** (Most Reliable):
+1. **Multiple `-m` Flags** (Best for AI automation):
    ```bash
-   # Create temporary message file
-   cat > .commit-msg-temp << 'EOF'
-   feat(scope): subject line here
-
-   Body paragraph explaining the change in detail.
-   Can include multiple lines and special characters.
-
-   - Bullet points work fine
-   - No escaping needed in file
-   EOF
-
-   # Commit using the file
-   git commit -F .commit-msg-temp
-
-   # Clean up
-   rm .commit-msg-temp
+   git commit \
+     -m "feat(scope): subject line" \
+     -m "Body paragraph 1 with detailed explanation." \
+     -m "Body paragraph 2 with more context." \
+     -m "- Bullet point 1" \
+     -m "- Bullet point 2" \
+     -m "Closes #123"
    ```
+   **Advantages**: No heredoc, no file I/O, reliable in automated contexts
 
-2. **Use Git Editor** (Interactive):
-   ```bash
-   git commit
-   # Opens your default editor (vim, nano, etc.)
-   # Write message, save, and close
-   ```
-
-3. **Simple Single-Line Messages**:
+2. **Simple Single-Line Messages**:
    ```bash
    git commit -m "feat(scope): brief description"
    ```
+   **Advantages**: Clean, fast, works everywhere
 
-**Avoid**:
-- ❌ Multi-line `-m` flags in terminal (causes parsing issues)
-- ❌ Unescaped quotes or special characters in `-m` strings
-- ❌ Line breaks directly in `-m` arguments
+3. **Echo to File** (if multi-line with special chars needed):
+   ```bash
+   echo "feat(scope): subject" > .commit-msg-temp && \
+   echo "" >> .commit-msg-temp && \
+   echo "Body text here." >> .commit-msg-temp && \
+   git commit -F .commit-msg-temp && \
+   rm .commit-msg-temp
+   ```
+   **Advantages**: Avoids heredoc, handles special characters
+
+4. **Git Editor** (manual/interactive only):
+   ```bash
+   git commit
+   # Opens your default editor (vim, nano, etc.)
+   ```
+
+**NEVER Use in Automated Commands**:
+- ❌ Heredoc syntax: `cat > file << 'EOF' ... EOF`
+- ❌ Multi-line strings directly in `-m` without proper escaping
+- ❌ Unescaped quotes or special characters in shell strings
+
+**Recovery from Stuck Heredoc**:
+- Press `Ctrl+C` to cancel
+- Type `EOF` alone on a line and press Enter
+- Close and restart terminal if unresponsive
 
 **For AI Assistants Creating Commits**:
-- Always use commit message files for multi-line messages
-- Create temporary file with full message content
-- Use `git commit -F <file>` to read from file
-- Clean up temporary file after successful commit
-- This prevents terminal escaping issues entirely
+1. **ALWAYS use multiple `-m` flags** for commits with body text
+2. **Keep each `-m` argument as a single line** (max 72 chars)
+3. **Use separate `-m` flags** for subject, body paragraphs, and footer
+4. **NEVER use heredoc** (`<< 'EOF'`) in terminal commands
+5. **Test simple patterns** that work reliably in automated contexts
 
 ### Git Commands Reference
 

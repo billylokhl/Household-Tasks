@@ -577,6 +577,13 @@ Located in Google Sheets menu bar after running `onOpen()`.
 6. System MUST format dates as MM/dd (E) for display
 7. System MUST generate HTML tooltips with category breakdowns
 8. System MUST project future task times when daysAhead > 0
+9. System MUST mark today's date with triangle marker (▶) on x-axis
+10. System MUST include BOTH completed and incomplete tasks for today:
+    - Completed tasks from TaskArchive (historical data)
+    - Incomplete tasks from Prioritization (tasks due today with empty CompletionDate)
+11. System MUST maintain data key consistency:
+    - Store details object with modified date labels (including ▶ marker)
+    - UI must lookup using original date (with marker), strip marker only for display
 
 **Acceptance Criteria**:
 - Chart shows 30 days of historical data
@@ -585,6 +592,10 @@ Located in Google Sheets menu bar after running `onOpen()`.
 - Top 10 categories are accurately ranked
 - Tooltip shows per-day category breakdown
 - Future projection appears when daysAhead > 0
+- Today's date displays with ▶ prefix on x-axis
+- Today's bars show all tasks due today (completed + incomplete)
+- Clicking today's bars displays correct task details in table
+- Details lookup uses consistent keys (date labels with triangle marker)
 
 ---
 
@@ -885,6 +896,9 @@ Located in Google Sheets menu bar after running `onOpen()`.
    - Days Ahead: 7 (project next week)
 4. System generates charts:
    - Fetches last 30 days from TaskArchive
+   - Queries Prioritization for incomplete tasks due today
+   - Combines completed (Archive) + incomplete (Prioritization) for today only
+   - Marks today's date with ▶ symbol on x-axis
    - Calculates moving average (weekend days only)
    - Projects future 7 days from Prioritization
    - Separates data by owner
@@ -957,12 +971,19 @@ Located in Google Sheets menu bar after running `onOpen()`.
 - Plan upcoming weeks based on projected time
 
 **Implementation Details**:
-- **Data Source**: TaskArchive (CompletionDate + ECT + Category + Owner)
+- **Data Source**: 
+  - Historical: TaskArchive (CompletionDate + ECT + Category + Owner)
+  - Today's Incomplete: Prioritization (DueDate = today, CompletionDate empty)
 - **Date Range**: Last 30 days + 0-14 days ahead
+- **Today's Date Marker**: Triangle symbol (▶) prefixed to today's date label on x-axis
 - **Category Grouping**: Top 10 + "Other"
 - **MA Window**: 1-30 days (default 28)
 - **Weekend Detection**: Saturday + Sunday only for MA calculation
 - **Tooltips**: HTML table with per-category breakdown
+- **Data Consistency**: 
+  - Details object keys include date labels WITH triangle marker
+  - UI lookup must use original date (with ▶), strip marker only for display text
+  - Prevents lookup mismatches when clicking chart bars
 
 ---
 
