@@ -198,6 +198,95 @@ const CONFIG = {
 
 ---
 
+## Documentation Maintenance
+
+### PRD Updates Required
+
+**CRITICAL**: The Product Requirements Document (docs/PRD.md) must be updated whenever features are added, removed, or significantly modified.
+
+**When to Update the PRD**:
+1. **New Feature Added** - Add to "Core Features" section with full specification
+2. **Feature Removed** - Remove from PRD or move to "Deprecated Features" appendix
+3. **Feature Modified** - Update affected sections (requirements, workflows, UI specs)
+4. **Data Model Changes** - Update schema documentation when columns/sheets change
+5. **UI Changes** - Update UI specifications when modals/interfaces are modified
+6. **API/Function Signature Changes** - Update technical specifications
+7. **Workflow Changes** - Update relevant workflow documentation
+
+**Sections That May Need Updates**:
+- Core Features (when features change)
+- Functional Requirements (when behavior changes)
+- Data Model (when schema changes)
+- User Interface (when UI changes)
+- Workflows (when processes change)
+- Technical Specifications (when architecture changes)
+
+**AI Assistant Workflow**:
+1. After implementing a feature change, ask: "Should I update the PRD to reflect this change?"
+2. If yes, identify affected sections
+3. Update PRD with precise changes (use multi_replace_string_in_file for efficiency)
+4. Commit PRD updates separately with `docs(prd):` prefix
+5. Ensure PRD stays in sync with implementation
+
+**Example PRD Update Commit**:
+```
+docs(prd): update recurring tasks feature specification
+
+Add WeekdayOK whitelist column to data model section.
+Update Functional Requirements FR-8 with whitelist behavior.
+Add whitelist workflow to Recurring Task Monitoring section.
+```
+
+### Test Documentation Updates Required
+
+**CRITICAL**: The Test Documentation (tests/README.md) must be updated whenever test infrastructure, test cases, or testing workflows change.
+
+**When to Update Test Documentation**:
+1. **New Test Suite Added** - Add to test structure section with description
+2. **New Mock Created** - Document mock classes and their usage
+3. **Test Helper Functions** - Document reusable test utilities
+4. **Coverage Changes** - Update coverage statistics and goals
+5. **Testing Workflow Changes** - Update instructions for running tests
+6. **New Testing Tools** - Document new dependencies or frameworks
+7. **Testing Best Practices** - Add new patterns or conventions
+
+**Sections That May Need Updates**:
+- Test Structure (when new test files added)
+- Test Types (when new test categories created)
+- Writing New Tests (when patterns change)
+- Mocking Google Apps Script (when mocks updated)
+- Coverage (when test coverage changes)
+- Limitations (when new testing constraints discovered)
+- Best Practices (when new patterns established)
+
+**AI Assistant Workflow**:
+1. After adding/modifying tests, ask: "Should I update tests/README.md?"
+2. If yes, identify affected sections
+3. Update test documentation with precise changes
+4. Include updated test counts and coverage stats
+5. Commit test doc updates with `docs(test):` prefix
+6. Keep test documentation in sync with actual test code
+
+**Example Test Doc Update Commit**:
+```
+docs(test): add SyncService integration test documentation
+
+Document new test suite for archive synchronization.
+Update test count from 28 to 45 tests.
+Add deduplication testing section.
+Document mock archive data setup patterns.
+```
+
+**Test Documentation Checklist**:
+- [ ] Updated test count in coverage section
+- [ ] Documented new test files in structure section
+- [ ] Added examples for new testing patterns
+- [ ] Updated mock usage if mocks changed
+- [ ] Refreshed "What Can Be Tested" sections
+- [ ] Added troubleshooting for new test types
+
+---
+
 # Git Commit Best Practices
 
 When working with Git, follow these software engineering best practices to maintain a clean, readable, and useful commit history.
@@ -555,6 +644,56 @@ Before committing, ask yourself:
 4. **Committing commented-out code** - Delete it (Git remembers)
 5. **Committing secrets/credentials** - Use environment variables
 6. **Vague messages** - "update stuff", "fix bug", "changes"
+
+### Commit Message Formatting for Terminal Safety
+
+**CRITICAL**: When creating commit messages, especially multi-line messages with body text, use proper escaping to prevent terminal issues.
+
+**Recommended Approaches**:
+
+1. **Use a Commit Message File** (Most Reliable):
+   ```bash
+   # Create temporary message file
+   cat > .commit-msg-temp << 'EOF'
+   feat(scope): subject line here
+
+   Body paragraph explaining the change in detail.
+   Can include multiple lines and special characters.
+
+   - Bullet points work fine
+   - No escaping needed in file
+   EOF
+
+   # Commit using the file
+   git commit -F .commit-msg-temp
+
+   # Clean up
+   rm .commit-msg-temp
+   ```
+
+2. **Use Git Editor** (Interactive):
+   ```bash
+   git commit
+   # Opens your default editor (vim, nano, etc.)
+   # Write message, save, and close
+   ```
+
+3. **Simple Single-Line Messages**:
+   ```bash
+   git commit -m "feat(scope): brief description"
+   ```
+
+**Avoid**:
+- ❌ Multi-line `-m` flags in terminal (causes parsing issues)
+- ❌ Unescaped quotes or special characters in `-m` strings
+- ❌ Line breaks directly in `-m` arguments
+
+**For AI Assistants Creating Commits**:
+- Always use commit message files for multi-line messages
+- Create temporary file with full message content
+- Use `git commit -F <file>` to read from file
+- Clean up temporary file after successful commit
+- This prevents terminal escaping issues entirely
 
 ### Git Commands Reference
 
