@@ -69,5 +69,45 @@ git diff --cached <filename>
 ## Documentation
 
 - **Project Architecture**: [.github/copilot-instructions.md](.github/copilot-instructions.md)
+- **Product Requirements**: [docs/PRD.md](docs/PRD.md)
 - **Git Setup Guide**: [docs/GIT_SETUP.md](docs/GIT_SETUP.md)
 - **Scripts Documentation**: [scripts/README.md](scripts/README.md)
+- **Testing Guide**: [tests/README.md](tests/README.md)
+
+## Testing
+
+This project includes automated testing infrastructure using Jest with Google Apps Script mocks.
+
+### Quick Start
+
+```bash
+# Install dependencies (first time only)
+npm install
+
+# Run all tests
+npm test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Generate coverage report
+npm run test:coverage
+```
+
+### Test Structure
+
+- **Unit Tests** (`tests/unit/`): Test individual functions in isolation
+  - `utilities.test.js` - Date and time parsing functions
+  - `configuration.test.js` - Configuration validation
+- **Integration Tests** (`tests/integration/`): Test modules with mocked Google services
+  - `day-planner.test.js` - Task filtering and planning logic
+- **Mocks** (`tests/mocks/`): Mock implementations of Google Apps Script services
+
+### Current Test Coverage
+
+✅ **28 tests passing**
+- Utilities: Date parsing, time value conversion
+- Configuration: Constants validation
+- DayPlanner: Task filtering, owner separation, date ranges, completion status
+
+For detailed testing documentation, see [tests/README.md](tests/README.md).
