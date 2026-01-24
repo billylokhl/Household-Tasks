@@ -242,9 +242,13 @@ function getTimeSpentData(maWindow, weekendOnly, daysAhead) {
         });
         tooltip += `<tr class="chart-total"><td class="chart-pt"><b>TOTAL:</b></td><td class="chart-val chart-pt"><b>${dayData.total}m</b></td></tr></table></div>`;
 
-        // Keep dateLabel consistent - don't modify it
-        // The triangle marker causes data lookup issues
-        let row = [lb];
+        // Add marker to today's date
+        let dateLabel = lb;
+        if (idx === todayIndex) {
+          dateLabel = `▶ ${lb}`; // Add triangle marker before today's date
+        }
+
+        let row = [dateLabel];
         const isFuture = dayData.isFuture;
 
         finalCategories.forEach((c, catIdx) => {
