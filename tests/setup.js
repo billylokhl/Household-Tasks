@@ -51,3 +51,16 @@ global.CONFIG = configModule.CONFIG;
 const utilsModule = loadGasModule('Utilities.js', ['safeParseDate', 'parseTimeValue']);
 global.safeParseDate = utilsModule.safeParseDate;
 global.parseTimeValue = utilsModule.parseTimeValue;
+
+// Load Code.js functions
+const codeModule = loadGasModule('Code.js', ['getSS', 'onOpen', 'findTaskRowInHistory', 'findDateColInHistory',
+  'openPlanner', 'showIncidentTrendModal', 'showTimeTrendModal', 'showWeekdayRecurringTasksModal', 'BACKUP_FOLDER_ID']);
+Object.keys(codeModule).forEach(key => {
+  if (codeModule[key]) global[key] = codeModule[key];
+});
+
+// Load BackupSystem functions
+const backupModule = loadGasModule('BackupSystem.js', ['createHourlySnapshot']);
+Object.keys(backupModule).forEach(key => {
+  if (backupModule[key]) global[key] = backupModule[key];
+});
