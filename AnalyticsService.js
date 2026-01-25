@@ -356,23 +356,41 @@ function getTimeSpentData(maWindow, weekendOnly, daysAhead) {
           let displayCat = topCats.includes(rawCat) ? rawCat : "Other";
 
           if (mins > 0) {
-            // Add incomplete Billy tasks
+            // Helper function to check if task already exists in taskDetails
+            const taskExistsInDetails = (ownerData) => {
+              // Check all categories for this task name
+              for (const cat in ownerData.taskDetails) {
+                const tasks = ownerData.taskDetails[cat] || [];
+                if (tasks.some(t => t.task === taskName)) {
+                  return true;
+                }
+              }
+              return false;
+            };
+
+            // Add incomplete Billy tasks only if completed version doesn't exist
             if (isBilly && !billyCompleted) {
-              timelineData.Billy[todayLabel][displayCat] += mins;
-              timelineData.Billy[todayLabel].total += mins;
-              timelineData.Billy[todayLabel].catBreakdown[rawCat] = (timelineData.Billy[todayLabel].catBreakdown[rawCat] || 0) + mins;
-              if (!timelineData.Billy[todayLabel].taskDetails[displayCat]) timelineData.Billy[todayLabel].taskDetails[displayCat] = [];
-              timelineData.Billy[todayLabel].taskDetails[displayCat].push({ task: taskName, mins: mins });
-              todayIncompleteCount++;
+              // Check if completed version already exists in timeline
+              if (!taskExistsInDetails(timelineData.Billy[todayLabel])) {
+                timelineData.Billy[todayLabel][displayCat] += mins;
+                timelineData.Billy[todayLabel].total += mins;
+                timelineData.Billy[todayLabel].catBreakdown[rawCat] = (timelineData.Billy[todayLabel].catBreakdown[rawCat] || 0) + mins;
+                if (!timelineData.Billy[todayLabel].taskDetails[displayCat]) timelineData.Billy[todayLabel].taskDetails[displayCat] = [];
+                timelineData.Billy[todayLabel].taskDetails[displayCat].push({ task: taskName, mins: mins });
+                todayIncompleteCount++;
+              }
             }
-            // Add incomplete Karen tasks
+            // Add incomplete Karen tasks only if completed version doesn't exist
             if (isKaren && !karenCompleted) {
-              timelineData.Karen[todayLabel][displayCat] += mins;
-              timelineData.Karen[todayLabel].total += mins;
-              timelineData.Karen[todayLabel].catBreakdown[rawCat] = (timelineData.Karen[todayLabel].catBreakdown[rawCat] || 0) + mins;
-              if (!timelineData.Karen[todayLabel].taskDetails[displayCat]) timelineData.Karen[todayLabel].taskDetails[displayCat] = [];
-              timelineData.Karen[todayLabel].taskDetails[displayCat].push({ task: taskName, mins: mins });
-              todayIncompleteCount++;
+              // Check if completed version already exists in timeline
+              if (!taskExistsInDetails(timelineData.Karen[todayLabel])) {
+                timelineData.Karen[todayLabel][displayCat] += mins;
+                timelineData.Karen[todayLabel].total += mins;
+                timelineData.Karen[todayLabel].catBreakdown[rawCat] = (timelineData.Karen[todayLabel].catBreakdown[rawCat] || 0) + mins;
+                if (!timelineData.Karen[todayLabel].taskDetails[displayCat]) timelineData.Karen[todayLabel].taskDetails[displayCat] = [];
+                timelineData.Karen[todayLabel].taskDetails[displayCat].push({ task: taskName, mins: mins });
+                todayIncompleteCount++;
+              }
             }
           }
         }
