@@ -214,4 +214,118 @@ describe('DayPlanner Integration Tests', () => {
       }
     });
   });
+
+  describe('Edge Cases', () => {
+    test('should handle empty Prioritization sheet', () => {
+      const emptyData = [
+        ['Task', 'Category', 'Importance', 'ECT', 'PriorityScore', 'DueDate',
+         'ReferenceDueDate', 'Ownership🐷', 'Ownership🐱', 'CompletionDate🐷',
+         'CompletionDate🐱', 'DaysTillDue']
+      ];
+
+      const emptySpreadsheet = new MockSpreadsheet();
+      emptySpreadsheet._addSheet('Prioritization', emptyData);
+      getSS.mockReturnValue(emptySpreadsheet);
+
+      const result = getPlannedTasks({ owner: '🐷', daysToPlan: 1 });
+      expect(Array.isArray(result)).toBe(true);
+      expect(result.length).toBe(0);
+    });
+
+    test('should handle tasks with missing due dates', () => {
+      const missingDateData = [
+        ['Task', 'Category', 'Importance', 'ECT', 'PriorityScore', 'DueDate',
+         'ReferenceDueDate', 'Ownership🐷', 'Ownership🐱', 'CompletionDate🐷',
+         'CompletionDate🐱', 'DaysTillDue'],
+        ['Task 1', 'Household', 'High', '30m', 85, null,
+         null, true, false, '', '', '0'],
+        ['Task 2', 'Personal', 'Normal', '1h', 70, '',
+         '', true, false, '', '', '1']
+      ];
+
+      const missingDateSpreadsheet = new MockSpreadsheet();
+      missingDateSpreadsheet._addSheet('Prioritization', missingDateData);
+      getSS.mockReturnValue(missingDateSpreadsheet);
+
+      const result = getPlannedTasks({ owner: '🐷', daysToPlan: 1 });
+      // Should skip tasks with invalid dates without crashing
+      expect(Array.isArray(result)).toBe(true);
+    });
+
+    test('should handle invalid owner filter', () => {
+      const result = getPlannedTasks({ owner: 'invalid', daysToPlan: 1 });
+      expect(Array.isArray(result)).toBe(true);
+      // Should return empty or handle gracefully
+    });
+
+    test('should handle negative daysToPlan', () => {
+      const result = getPlannedTasks({ owner: '🐷', daysToPlan: -5 });
+      expect(Array.isArray(result)).toBe(true);
+      // Should handle negative values gracefully
+    });
+
+    test('should handle zero daysToPlan', () => {
+      const result = getPlannedTasks({ owner: '🐷', daysToPlan: 0 });
+      expect(Array.isArray(result)).toBe(true);
+      // Should return empty or only today's tasks
+    });
+
+    test('should handle tasks with no ECT', () => {
+      const noEctData = [
+        ['Task', 'Category', 'Importance', 'ECT', 'PriorityScore', 'DueDate',
+         'ReferenceDueDate', 'Ownership🐷', 'Ownership🐱', 'CompletionDate🐷',
+         'CompletionDate🐱', 'DaysTillDue'],
+        ['Task 1', 'Household', 'High', '', 85, new Date('2026-01-24'),
+         new Date('2026-01-24'), true, false, '', '', '0'],
+        ['Task 2', 'Personal', 'Normal', null, 70, new Date('2026-01-24'),
+         new Date('2026-01-24'), true, false, '', '', '0']
+      ];
+
+      const noEctSpreadsheet = new MockSpreadsheet();
+      noEctSpreadsheet._addSheet('Prioritization', noEctData);
+      getSS.mockReturnValue(noEctSpreadsheet);
+
+      const result = getPlannedTasks({ owner: '🐷', daysToPlan: 1 });
+      expect(Array.isArray(result)).toBe(true);
+      // Should handle missing ECT values
+      if (result.length > 0) {
+        expect(result[0].ectMins).toBeDefined();
+      }
+    });
+
+    test('should handle tasks with no ownership flags', () => {
+      const noOwnerData = [
+        ['Task', 'Category', 'Importance', 'ECT', 'PriorityScore', 'DueDate',
+         'ReferenceDueDate', 'Ownership🐷', 'Ownership🐱', 'CompletionDate🐷',
+         'CompletionDate🐱', 'DaysTillDue'],
+        ['Task 1', 'Household', 'High', '30m', 85, new Date('2026-01-24'),
+         new Date('2026-01-24'), false, false, '', '', '0']
+      ];
+
+      const noOwnerSpreadsheet = new MockSpreadsheet();
+      noOwnerSpreadsheet._addSheet('Prioritization', noOwnerData);
+      getSS.mockReturnValue(noOwnerSpreadsheet);
+
+      const result = getPlannedTasks({ owner: '🐷', daysToPlan: 1 });
+      expect(Array.isArray(result)).toBe(true);
+      // Tasks with no owner should be excluded
+      expect(result.length).toBe(0);
+    });
+
+    test('should handle extreme daysToPlan values', () => {
+      const result1 = getPlannedTasks({ owner: '🐷', daysToPlan: 1000 });
+      expect(Array.isArray(result1)).toBe(true);
+
+      const result2 = getPlannedTasks({ owner: '🐷', daysToPlan: 1 });
+      expect(Array.isArray(result2)).toBe(true);
+    });
+
+    test('should handle malformed config object', () => {
+      const result1 = getPlannedTasks({});
+      expect(Array.isArray(result1) || result1.error).toBe(true);
+
+      // Null config causes crash - function expects config.daysToPlan
+      expect(() => getPlannedTasks(null)).toThrow();
+    });
+  });
 });

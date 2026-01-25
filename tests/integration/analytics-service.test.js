@@ -224,4 +224,110 @@ describe('AnalyticsService Integration Tests', () => {
       }
     });
   });
+
+  describe('Edge Cases', () => {
+    test('should handle empty archive sheet', () => {
+      const emptyData = [['Sync Date', 'Task', 'Category', 'ECT', 'Ownership🐷', 'Ownership🐱', 'CompletionDate']];
+      const emptySheet = mockSpreadsheet._addSheet('TaskArchive', emptyData);
+
+      const result = getTimeSpentData(28, true, 0);
+      expect(result.error).toBeUndefined();
+      expect(result.dataA.length).toBe(31); // Header + 30 days of zeros
+    });
+
+    test('should handle invalid completion dates gracefully', () => {
+      const invalidDateData = [
+        ['Sync Date', 'Task', 'Category', 'ECT', 'Ownership🐷', 'Ownership🐱', 'CompletionDate'],
+        [new Date(), 'Task 1', 'Household', '30', true, false, 'invalid-date'],
+        [new Date(), 'Task 2', 'Work', '60', false, true, null],
+        [new Date(), 'Task 3', 'Personal', '45', true, false, undefined]
+      ];
+
+      mockSpreadsheet._addSheet('TaskArchive', invalidDateData);
+      const result = getTimeSpentData(28, true, 0);
+
+      expect(result.error).toBeUndefined();
+      // Should skip invalid dates without crashing
+    });
+
+    test('should handle missing category column', () => {
+      const noCategoryData = [
+        ['Sync Date', 'Task', 'ECT', 'Ownership🐷', 'Ownership🐱', 'CompletionDate'],
+        [new Date(), 'Task 1', '30', true, false, new Date()]
+      ];
+
+      mockSpreadsheet._addSheet('TaskArchive', noCategoryData);
+      const result = getTimeSpentData(28, true, 0);
+
+      expect(result.error).toBeDefined();
+      expect(result.error).toContain('Category');
+    });
+
+    test('should handle extreme ECT values', () => {
+      const extremeData = [
+        ['Sync Date', 'Task', 'Category', 'ECT', 'Ownership🐷', 'Ownership🐱', 'CompletionDate'],
+        [new Date(), 'Huge task', 'Work', '100000', true, false, new Date()],
+        [new Date(), 'Tiny task', 'Work', '0.01', true, false, new Date()],
+        [new Date(), 'Zero task', 'Work', '0', true, false, new Date()]
+      ];
+
+      mockSpreadsheet._addSheet('TaskArchive', extremeData);
+      const result = getTimeSpentData(28, true, 0);
+
+      expect(result.error).toBeUndefined();
+      // Should handle extreme values without overflow
+    });
+
+    test('should handle tasks without category', () => {
+      const noCatData = [
+        ['Sync Date', 'Task', 'Category', 'ECT', 'Ownership🐷', 'Ownership🐱', 'CompletionDate'],
+        [new Date(), 'Task 1', '', '30', true, false, new Date()],
+        [new Date(), 'Task 2', null, '60', false, true, new Date()]
+      ];
+
+      mockSpreadsheet._addSheet('TaskArchive', noCatData);
+      const result = getTimeSpentData(28, true, 0);
+
+      expect(result.error).toBeUndefined();
+      // Should handle empty/null categories gracefully
+    });
+
+    test('should handle negative or zero MA window', () => {
+      const result1 = getTimeSpentData(0, true, 0);
+      expect(result1.error).toBeUndefined();
+
+      const result2 = getTimeSpentData(-5, true, 0);
+      expect(result2.error).toBeUndefined();
+      // Should handle invalid window values gracefully
+    });
+
+    test('should handle malformed ownership columns', () => {
+      const malformedData = [
+        ['Sync Date', 'Task', 'Category', 'ECT', 'Ownership🐷', 'Ownership🐱', 'CompletionDate'],
+        [new Date(), 'Task 1', 'Work', '30', 'not-a-boolean', false, new Date()],
+        [new Date(), 'Task 2', 'Work', '60', null, undefined, new Date()]
+      ];
+
+      mockSpreadsheet._addSheet('TaskArchive', malformedData);
+      const result = getTimeSpentData(28, true, 0);
+
+      expect(result.error).toBeUndefined();
+      // Should handle malformed ownership values
+    });
+
+    test('should handle empty incident data', () => {
+      const noIncidentData = [
+        ['Sync Date', 'Task', 'Category', 'ECT', 'Ownership🐷', 'Ownership🐱',
+         'CompletionDate', 'IncidentDate', 'IncidentOwner'],
+        [new Date(), 'Task 1', 'Work', '30', true, false, new Date(), '', '']
+      ];
+
+      mockSpreadsheet._addSheet('TaskArchive', noIncidentData);
+      const result = getIncidentTrendData();
+
+      expect(result.error).toBeUndefined();
+      expect(result.pig.length).toBeGreaterThan(0);
+      expect(result.cat.length).toBeGreaterThan(0);
+    });
+  });
 });
