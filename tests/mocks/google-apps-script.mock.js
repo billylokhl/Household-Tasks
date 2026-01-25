@@ -162,6 +162,10 @@ class MockSpreadsheet {
     this._sheets[name] = new MockSheet(name, data);
     return this._sheets[name];
   }
+
+  _setTimeZone(timezone) {
+    this._timezone = timezone;
+  }
 }
 
 class MockSpreadsheetApp {
@@ -186,6 +190,17 @@ class MockSpreadsheetApp {
 
   flush() {
     // No-op in mock
+  }
+
+  getUi() {
+    return {
+      alert: jest.fn(),
+      createMenu: jest.fn().mockReturnThis(),
+      addItem: jest.fn().mockReturnThis(),
+      addToUi: jest.fn(),
+      showModalDialog: jest.fn(),
+      showSidebar: jest.fn()
+    };
   }
 
   // Helper method for testing
