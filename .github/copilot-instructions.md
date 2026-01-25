@@ -797,6 +797,15 @@ Closes #123
 2. **After completing feature** - When logical unit is done
 3. **When files from different subsystems are staged** - Suggest splitting
 
+**Before Every Commit - Documentation Check:**
+When staging/committing changes, ALWAYS mentally check:
+- Did I add/modify/remove a feature? → Consider updating PRD
+- Did I add/modify tests? → Consider updating tests/README.md
+- Did I change function signatures or behavior? → Review if copilot-instructions.md needs updates
+
+Only mention documentation updates if ACTUALLY NEEDED (API changes, new features, schema changes).
+Do NOT suggest doc updates for: bug fixes, internal refactors, style changes, minor logic tweaks.
+
 **Response Template:**
 ```
 "Before we proceed, I notice uncommitted changes for [describe changes].
