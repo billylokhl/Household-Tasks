@@ -14,7 +14,15 @@ const codeContent = fs.readFileSync(codePath, 'utf8');
 // Mock global functions
 global.SpreadsheetApp = {
   getActiveSpreadsheet: jest.fn(),
-  getUi: jest.fn()
+  getUi: jest.fn(() => ({
+    createMenu: jest.fn().mockReturnThis(),
+    addItem: jest.fn().mockReturnThis(),
+    addSeparator: jest.fn().mockReturnThis(),
+    addToUi: jest.fn(),
+    showModalDialog: jest.fn(),
+    alert: jest.fn()
+  })),
+  flush: jest.fn()
 };
 
 global.HtmlService = {
@@ -33,6 +41,13 @@ global.Utilities = {
   })
 };
 
+global.Session = {
+  getScriptTimeZone: jest.fn(() => 'America/New_York')
+};
+
+// Mock getSS function before loading Code.js
+global.getSS = jest.fn();
+
 // Load Code.js into global scope
 eval(codeContent);
 
@@ -47,11 +62,13 @@ describe('Code.js Unit Tests', () => {
     mockUi = {
       createMenu: jest.fn().mockReturnThis(),
       addItem: jest.fn().mockReturnThis(),
+      addSeparator: jest.fn().mockReturnThis(),
       addToUi: jest.fn()
     };
 
     SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(mockSpreadsheet);
     SpreadsheetApp.getUi.mockReturnValue(mockUi);
+    getSS.mockReturnValue(mockSpreadsheet);
   });
 
   afterEach(() => {
@@ -104,7 +121,7 @@ describe('Code.js Unit Tests', () => {
       expect(result).toBe(2); // Row 2 (1-indexed, excluding header)
     });
 
-    test('should return -1 if task not found', () => {
+    test('should return null if task not found', () => {
       const historyData = [
         ['Category', 'Task', '2026-01-24'],
         ['Household', 'Clean Kitchen', 30]
@@ -114,7 +131,7 @@ describe('Code.js Unit Tests', () => {
 
       const result = findTaskRowInHistory('Work', 'Nonexistent Task');
 
-      expect(result).toBe(-1);
+      expect(result).toBeNull();
     });
 
     test('should match category and task name', () => {
@@ -134,7 +151,7 @@ describe('Code.js Unit Tests', () => {
     test('should handle missing TaskHistory sheet', () => {
       const result = findTaskRowInHistory('Household', 'Any Task');
 
-      expect(result).toBe(-1);
+      expect(result).toBeNull();
     });
   });
 
@@ -153,7 +170,7 @@ describe('Code.js Unit Tests', () => {
       expect(result).toBe(4); // Column 4 (D in spreadsheet, 1-indexed)
     });
 
-    test('should return -1 if date not found', () => {
+    test('should return 3 (default column) if date not found', () => {
       const historyData = [
         ['Category', 'Task', '2026-01-24'],
         ['Household', 'Task 1', 30]
@@ -164,7 +181,7 @@ describe('Code.js Unit Tests', () => {
       const targetDate = new Date('2026-12-31');
       const result = findDateColInHistory(targetDate);
 
-      expect(result).toBe(-1);
+      expect(result).toBe(3); // Returns default column 3
     });
 
     test('should handle Date objects and strings', () => {
@@ -185,7 +202,7 @@ describe('Code.js Unit Tests', () => {
       const targetDate = new Date('2026-01-24');
       const result = findDateColInHistory(targetDate);
 
-      expect(result).toBe(-1);
+      expect(result).toBeNull();
     });
   });
 

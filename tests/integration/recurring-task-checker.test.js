@@ -13,7 +13,13 @@ const recurringCode = fs.readFileSync(recurringPath, 'utf8');
 
 // Mock global functions
 global.SpreadsheetApp = {
-  getActiveSpreadsheet: jest.fn()
+  getActiveSpreadsheet: jest.fn(),
+  getUi: jest.fn(() => ({
+    alert: jest.fn(),
+    createMenu: jest.fn().mockReturnThis(),
+    addItem: jest.fn().mockReturnThis(),
+    addToUi: jest.fn()
+  }))
 };
 global.HtmlService = {
   createHtmlOutputFromFile: jest.fn().mockReturnValue({

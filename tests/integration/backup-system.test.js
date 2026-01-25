@@ -77,7 +77,13 @@ global.DriveApp = {
 
 global.SpreadsheetApp = {
   getActiveSpreadsheet: jest.fn(),
-  openById: jest.fn()
+  openById: jest.fn(),
+  getUi: jest.fn(() => ({
+    alert: jest.fn(),
+    createMenu: jest.fn().mockReturnThis(),
+    addItem: jest.fn().mockReturnThis(),
+    addToUi: jest.fn()
+  }))
 };
 
 global.Utilities = {
@@ -90,6 +96,9 @@ global.Utilities = {
     return `${year}-${month}-${day}_${hour}${minute}`;
   })
 };
+
+// Mock getSS function used by BackupSystem
+global.getSS = jest.fn();
 
 // Load BackupSystem into global scope
 eval(backupCode);
@@ -123,6 +132,7 @@ describe('BackupSystem Integration Tests', () => {
     mockSpreadsheet.getName = jest.fn(() => 'Test Spreadsheet');
 
     SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(mockSpreadsheet);
+    getSS.mockReturnValue(mockSpreadsheet);
   });
 
   afterEach(() => {
