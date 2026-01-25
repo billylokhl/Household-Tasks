@@ -2,6 +2,170 @@
 
 This Google Apps Script project is a household task management system with prioritization, time tracking, analytics, and automated archival capabilities.
 
+---
+
+## ⚠️ CRITICAL: Feature Change Protection Guidelines
+
+**MANDATORY PROCEDURE**: Every time a feature is added, removed, or modified, you MUST prevent unintentional changes or breakage to other features.
+
+### Pre-Change Checklist
+
+Before making ANY code changes, complete this checklist:
+
+1. **Read the PRD** ([docs/PRD.md](../docs/PRD.md))
+   - Review the specific feature you're modifying
+   - Understand dependencies and related features
+   - Note any "Critical Preservation Rules"
+
+2. **Identify Impact Radius**
+   - Which modules does this change affect?
+   - Which features use the same data columns?
+   - Which functions call or are called by modified functions?
+   - Which UI components display this data?
+
+3. **Review Dependencies**
+   - Check for shared utilities (parseTimeValue, safeParseDate)
+   - Verify column name references (emoji variations)
+   - Check CONFIG constant usage
+   - Review sheet schema dependencies
+
+### During Implementation
+
+**CRITICAL RULES**:
+
+1. **Never modify unrelated code**
+   - Only change files directly related to your task
+   - Resist the urge to "clean up" other code
+   - Save refactoring for separate, dedicated commits
+
+2. **Preserve existing behaviors**
+   - If modifying a shared function, ensure backward compatibility
+   - Add new parameters as optional with defaults
+   - Never change function return types without updating all callers
+
+3. **Maintain data integrity**
+   - Never remove columns without migration logic
+   - Never change column detection logic without testing all features
+   - Preserve all "Critical Preservation Rules" from PRD
+
+4. **Respect ownership patterns**
+   - Maintain 🐷 (Billy) vs 🐱 (Karen) separation
+   - Never mix owner-specific logic
+   - Test both ownership paths
+
+### Post-Change Verification
+
+After implementing changes, MUST complete ALL of these:
+
+1. **✅ Run Full Test Suite**
+   ```bash
+   npm test
+   ```
+   - ALL tests must pass (except documented skips)
+   - Fix any new failures before proceeding
+   - If tests need updates, update them in a separate commit
+
+2. **✅ Manual Feature Verification**
+   - Test the modified feature end-to-end
+   - Test at least 2 related features that might be affected
+   - Verify both 🐷 and 🐱 ownership paths work
+
+3. **✅ PRD Cross-Reference**
+   - Open [docs/PRD.md](../docs/PRD.md)
+   - Verify ALL 8 Core Features are still described accurately
+   - Check that your change matches the PRD spec
+   - Update PRD if behavior intentionally changed
+
+4. **✅ Critical Preservation Rules Check**
+   - Review list in copilot-instructions.md
+   - Confirm none were violated
+   - If you added new critical rules, document them
+
+5. **✅ Regression Check**
+   Read through this list and confirm NONE were broken:
+   - [ ] Menu "🚀 Task Tools" still has all 7 items
+   - [ ] Day Planner filtering works (owner, date range, overdue, completed)
+   - [ ] Archive sync includes schema migration
+   - [ ] Daily cleanup preserves incident tasks
+   - [ ] Time Trend shows TODAY marker (▶) and avoids double-counting
+   - [ ] Incident Trend shows 14-day rolling sum
+   - [ ] Backup uses correct folder ID: `1S_HRJlzJ9JPMcD2aamy036FIGb8xxd96`
+   - [ ] Recurring Task Checker respects WeekdayOK whitelist
+   - [ ] All date formats: yyyy-MM-dd for storage, MM/dd (E) for display
+   - [ ] parseTimeValue() used for all time parsing
+   - [ ] safeParseDate() used for all date parsing
+   - [ ] Ownership separation maintained (🐷 vs 🐱)
+
+### Red Flags - STOP and Verify
+
+If any of these occur during your work, STOP and verify you haven't broken anything:
+
+- 🚨 **Modifying shared utilities** (Utilities.js, Configuration.js)
+- 🚨 **Changing column detection logic** in any service
+- 🚨 **Altering CONFIG constants**
+- 🚨 **Modifying schema migration code**
+- 🚨 **Changing deduplication logic**
+- 🚨 **Updating parseTimeValue or safeParseDate**
+- 🚨 **Modifying cleanup deletion rules**
+- 🚨 **Changing menu structure in onOpen()**
+- 🚨 **Altering date format patterns**
+
+### AI Assistant Workflow
+
+When user requests a feature change:
+
+1. **Acknowledge request** and state what will be changed
+2. **Run pre-change checklist** (read PRD section, identify impact)
+3. **Implement change** (focused, no scope creep)
+4. **Run post-change verification** (tests, manual checks, PRD cross-reference)
+5. **Report results** with explicit confirmation:
+   ```
+   ✅ Change complete. Verification:
+   - Tests: X passing (same as before)
+   - Modified features: [list] - tested and working
+   - Related features: [list] - verified unchanged
+   - PRD: [in sync / updated in commit ABC]
+   ```
+
+### Example: Safe Feature Addition
+
+**User Request**: "Add a 'Priority Filter' to Day Planner"
+
+**Correct Approach**:
+1. Read PRD sections: Core Features #2, FR-2
+2. Impact: DayPlanner.js, DayPlannerUI.html only
+3. Dependencies: getPlannedTasks() filters, UI dropdown
+4. Implementation: Add optional minPriority parameter to getPlannedTasks()
+5. Testing: Run npm test, verify planner loads and filters work
+6. PRD Check: Update Core Features #2 with new filter capability
+7. Commit: `feat(planner): add priority filter with min threshold`
+
+**Incorrect Approach**:
+- ❌ Also "improving" the ECT parsing while you're in the code
+- ❌ Refactoring the filter logic into a new utility file
+- ❌ Changing how PriorityScore is calculated
+- ❌ Skipping test verification
+
+### Documentation Requirements
+
+After ANY feature change:
+
+1. **Update PRD** if behavior changed (separate commit)
+2. **Update tests/README.md** if tests changed (separate commit)
+3. **Update copilot-instructions.md** if new critical rules added
+
+### Emergency: "I Think I Broke Something"
+
+If you suspect unintentional breakage:
+
+1. **Run tests immediately**: `npm test`
+2. **Check git diff**: `git diff` - review ALL changes
+3. **Revert if needed**: `git restore <file>` for specific files
+4. **Ask for help**: Describe what changed and what broke
+5. **Reference PRD**: Compare behavior against PRD requirements
+
+---
+
 ## Core Module Specifications
 
 ### 1. Code.js - Main Entry Point & Menu System
