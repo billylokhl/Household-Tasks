@@ -26,6 +26,18 @@ function onOpen() {
     .addSeparator()
     .addItem('Manual Backup', 'createHourlySnapshot')
     .addToUi();
+
+  // Food Expiration AI menu (only if sheet exists)
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (ss.getSheetByName('Food Expiration')) {
+    ui.createMenu('🍎 Food AI')
+      .addItem('Predict Selected Items', 'predictSelectedFoodStorage')
+      .addItem('Predict All Empty Items', 'predictAllEmptyFoodStorage')
+      .addSeparator()
+      .addItem('Setup Gemini API', 'setupGeminiAPI')
+      .addItem('Test API Connection', 'testGeminiAPI')
+      .addToUi();
+  }
 }
 
 /**
