@@ -7,7 +7,8 @@
     :root { --bg: #ffffff; --text: #333333; --border: #e2e8f0; }
     body.dark-mode { --bg: #0f172a; --text: #f1f5f9; --border: #334155; }
     body { font-family: 'Segoe UI', sans-serif; background-color: var(--bg); color: var(--text); padding: 20px; height: 100vh; display: flex; flex-direction: column; overflow: hidden; margin: 0; box-sizing: border-box; }
-    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-shrink: 0; }
+    .header { display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; flex-shrink: 0; }
+    .header-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
     .btn-group { display: flex; gap: 10px; }
     .btn { padding: 12px 24px; cursor: pointer; border: 1px solid var(--border); border-radius: 8px; background: #f8fafc; font-size: 18px; }
     .btn.active { background: #3b82f6; color: white; border-color: #2563eb; }
@@ -25,28 +26,32 @@
 </head>
 <body id="body">
   <div class="header">
-    <div class="btn-group">
-      <button id="btnA" class="btn active" onclick="switchOwner('A')">🐷</button>
-      <button id="btnB" class="btn" onclick="switchOwner('B')">🐱</button>
+    <div class="header-row">
+      <div class="btn-group">
+        <button id="btnA" class="btn active" onclick="switchOwner('A')">🐷</button>
+        <button id="btnB" class="btn" onclick="switchOwner('B')">🐱</button>
+      </div>
+      <div class="btn-group">
+        <button class="btn" style="font-size:14px" onclick="toggleDebugLog()">🔍 Debug Log</button>
+        <button class="btn" style="font-size:14px" onclick="toggleTheme()">🌓 Theme</button>
+      </div>
     </div>
-    <div class="btn-group" style="align-items: center;">
-      <label style="font-size: 14px; margin-right: 5px;">Moving Daily Average Window:</label>
-      <input type="number" id="maWindow" value="28" min="2" max="29" style="width: 60px; padding: 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--text);" onchange="refreshData()" />
-      <span style="font-size: 14px; margin-left: 3px;">days</span>
-      <label style="font-size: 14px; margin-left: 15px; display: flex; align-items: center; cursor: pointer;">
-        <input type="checkbox" id="weekendOnly" checked onchange="refreshData()" style="margin-right: 5px; cursor: pointer;" />
-        Weekend Only
-      </label>
-      <label style="font-size: 14px; margin-left: 15px; display: flex; align-items: center; cursor: pointer;">
-        <input type="checkbox" id="showMA" checked onchange="drawChart()" style="margin-right: 5px; cursor: pointer;" />
-        Show MA
-      </label>
-      <label style="font-size: 14px; margin-left: 15px; margin-right: 5px;">Days to Look Ahead:</label>
-      <input type="number" id="daysAhead" value="7" min="0" max="30" style="width: 60px; padding: 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--text);" onchange="refreshData()" />
-    </div>
-    <div class="btn-group">
-      <button class="btn" style="font-size:14px" onclick="toggleDebugLog()">🔍 Debug Log</button>
-      <button class="btn" style="font-size:14px" onclick="toggleTheme()">🌓 Theme</button>
+    <div class="header-row">
+      <div class="btn-group" style="align-items: center; flex-wrap: wrap;">
+        <label style="font-size: 14px; margin-right: 5px;">Moving Daily Average Window:</label>
+        <input type="number" id="maWindow" value="28" min="2" max="29" style="width: 60px; padding: 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--text);" onchange="refreshData()" />
+        <span style="font-size: 14px; margin-left: 3px;">days</span>
+        <label style="font-size: 14px; margin-left: 15px; display: flex; align-items: center; cursor: pointer;">
+          <input type="checkbox" id="weekendOnly" checked onchange="refreshData()" style="margin-right: 5px; cursor: pointer;" />
+          Weekend Only
+        </label>
+        <label style="font-size: 14px; margin-left: 15px; display: flex; align-items: center; cursor: pointer;">
+          <input type="checkbox" id="showMA" checked onchange="drawChart()" style="margin-right: 5px; cursor: pointer;" />
+          Show MA
+        </label>
+        <label style="font-size: 14px; margin-left: 15px; margin-right: 5px;">Days to Look Ahead:</label>
+        <input type="number" id="daysAhead" value="7" min="0" max="30" style="width: 60px; padding: 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--text);" onchange="refreshData()" />
+      </div>
     </div>
   </div>
   <div id="chart_div"></div>
