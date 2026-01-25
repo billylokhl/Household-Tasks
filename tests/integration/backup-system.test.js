@@ -145,13 +145,21 @@ describe('BackupSystem Integration Tests', () => {
     });
 
     test('should handle errors gracefully', () => {
-      // Mock getSS to throw an error
-      getSS.mockImplementation(() => {
-        throw new Error('Test error');
-      });
+      const mockSS = {
+        getId: jest.fn(() => { throw new Error('Test error'); }),
+        toast: jest.fn()
+      };
 
-      // Should not throw when error occurs
+      getSS.mockReturnValue(mockSS);
+
+      // Should not throw when error occurs in try block
       expect(() => createHourlySnapshot()).not.toThrow();
+
+      // Should call toast with error message
+      expect(mockSS.toast).toHaveBeenCalledWith(
+        expect.stringContaining('Backup failed:'),
+        '❌ Error'
+      );
     });
 
     test('should use BACKUP_FOLDER_ID from CONFIG', () => {
