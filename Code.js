@@ -36,6 +36,7 @@ function onOpen() {
       .addSeparator()
       .addItem('Setup Gemini API', 'setupGeminiAPI')
       .addItem('Test API Connection', 'testGeminiAPI')
+      .addItem('🔍 Full Diagnostic', 'diagnosticTestFull')
       .addToUi();
   }
 }

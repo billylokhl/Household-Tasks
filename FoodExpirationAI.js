@@ -9,11 +9,15 @@
  * @returns {Object} Object with storageMethod and fridgeSection properties
  */
 function predictFoodStorage(foodItem) {
+  Logger.log('=== Starting predictFoodStorage for: ' + foodItem + ' ===');
+
   const apiKey = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
 
   if (!apiKey) {
     throw new Error('Gemini API key not configured. Please run setupGeminiAPI() first.');
   }
+
+  Logger.log('API key found');
 
   const prompt = `You are a food storage expert. Given a food item, predict the best storage method and location.
 
@@ -34,18 +38,16 @@ If storage method is "fridge", also specify the section from:
 - veggie drawer
 - fruit drawer
 
-If storage method is NOT "fridge", the section should be empty.
+If storage method is NOT "fridge", set fridgeSection to empty string.
 
-Respond ONLY with a JSON object in this exact format (no markdown, no explanation):
-{"storageMethod": "chosen_method", "fridgeSection": "chosen_section_or_empty"}
+IMPORTANT: Respond with ONLY a valid JSON object, nothing else. No explanations, no markdown. Just the JSON.
+Format: {"storageMethod": "method", "fridgeSection": "section or empty string"}
 
-Examples:
-- Milk: {"storageMethod": "fridge", "fridgeSection": "2nd shelf"}
-- Carrots: {"storageMethod": "fridge", "fridgeSection": "veggie drawer"}
-- Bread: {"storageMethod": "kitchen cabinet", "fridgeSection": ""}
-- Ice cream: {"storageMethod": "freezer", "fridgeSection": ""}`;
+Example responses:
+{"storageMethod": "fridge", "fridgeSection": "2nd shelf"}
+{"storageMethod": "freezer", "fridgeSection": ""}`;
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
   const payload = {
     contents: [{
@@ -54,8 +56,8 @@ Examples:
       }]
     }],
     generationConfig: {
-      temperature: 0.2,
-      maxOutputTokens: 100
+      temperature: 0.1,
+      maxOutputTokens: 500
     }
   };
 
@@ -67,35 +69,94 @@ Examples:
   };
 
   try {
+    Logger.log('Calling Gemini API...');
     const response = UrlFetchApp.fetch(url, options);
     const responseCode = response.getResponseCode();
 
+    Logger.log('Response code: ' + responseCode);
+
     if (responseCode !== 200) {
-      Logger.log('API Error Response: ' + response.getContentText());
-      throw new Error(`Gemini API error (${responseCode}): ${response.getContentText()}`);
+      const errorText = response.getContentText();
+      Logger.log('API Error Response: ' + errorText);
+      throw new Error(`Gemini API error (${responseCode}): ${errorText}`);
     }
 
-    const result = JSON.parse(response.getContentText());
+    const fullResponseText = response.getContentText();
+    Logger.log('Full API response length: ' + fullResponseText.length);
+
+    const result = JSON.parse(fullResponseText);
 
     if (!result.candidates || result.candidates.length === 0) {
+      Logger.log('No candidates in response');
       throw new Error('No response from Gemini API');
     }
 
-    const textResponse = result.candidates[0].content.parts[0].text.trim();
-    Logger.log('Raw Gemini response: ' + textResponse);
+    Logger.log('Number of candidates: ' + result.candidates.length);
+    Logger.log('Number of parts: ' + result.candidates[0].content.parts.length);
 
-    // Parse the JSON response
-    const prediction = JSON.parse(textResponse);
+    // Get text from all parts
+    let textResponse = '';
+    for (let i = 0; i < result.candidates[0].content.parts.length; i++) {
+      const part = result.candidates[0].content.parts[i];
+      if (part.text) {
+        Logger.log('Part ' + i + ' text: ' + part.text);
+        textResponse += part.text;
+      }
+    }
 
-    // Validate the response
+    textResponse = textResponse.trim();
+    Logger.log('Combined text response: ' + textResponse);
+
+    if (!textResponse) {
+      throw new Error('Gemini returned empty text response');
+    }
+
+    // Extract JSON from response
+    let cleanedResponse = textResponse;
+
+    // Remove markdown if present
+    if (cleanedResponse.startsWith('```json')) {
+      cleanedResponse = cleanedResponse.replace(/^```json\s*/, '').replace(/```\s*$/, '').trim();
+    } else if (cleanedResponse.startsWith('```')) {
+      cleanedResponse = cleanedResponse.replace(/^```\s*/, '').replace(/```\s*$/, '').trim();
+    }
+
+    // Extract JSON object
+    const jsonStartIndex = cleanedResponse.indexOf('{');
+    const jsonEndIndex = cleanedResponse.lastIndexOf('}');
+
+    if (jsonStartIndex >= 0 && jsonEndIndex > jsonStartIndex) {
+      cleanedResponse = cleanedResponse.substring(jsonStartIndex, jsonEndIndex + 1);
+    }
+
+    Logger.log('Cleaned response: ' + cleanedResponse);
+
+    // Parse JSON
+    let prediction;
+    try {
+      prediction = JSON.parse(cleanedResponse);
+      Logger.log('Successfully parsed JSON');
+    } catch (parseError) {
+      Logger.log('JSON Parse Error: ' + parseError.toString());
+      Logger.log('Attempted to parse: ' + cleanedResponse);
+      throw new Error('Failed to parse Gemini response as JSON: ' + parseError.message + '\nResponse: ' + cleanedResponse);
+    }
+
+    // Validate
     const validStorageMethods = ['fridge', 'freezer', 'kitchen cabinet', 'food cabinet', 'cake stand'];
-    const validFridgeSections = ['1st shelf', '2nd shelf', '3rd shelf', '4th shelf', 'veggie drawer', 'fruit drawer', ''];
+    const validFridgeSections = ['1st shelf', '2nd shelf', '3rd shelf', '4th shelf', 'veggie drawer', 'fruit drawer'];
 
     if (!validStorageMethods.includes(prediction.storageMethod)) {
       throw new Error(`Invalid storage method: ${prediction.storageMethod}`);
     }
 
-    if (!validFridgeSections.includes(prediction.fridgeSection)) {
+    // Normalize fridgeSection
+    if (!prediction.fridgeSection) {
+      prediction.fridgeSection = '';
+    }
+
+    // Validate fridgeSection if provided
+    if (prediction.fridgeSection && !validFridgeSections.includes(prediction.fridgeSection)) {
       throw new Error(`Invalid fridge section: ${prediction.fridgeSection}`);
     }
 
@@ -104,10 +165,11 @@ Examples:
       prediction.fridgeSection = '';
     }
 
+    Logger.log('=== Prediction successful: ' + JSON.stringify(prediction) + ' ===');
     return prediction;
 
   } catch (error) {
-    Logger.log('Error in predictFoodStorage: ' + error.toString());
+    Logger.log('=== ERROR in predictFoodStorage: ' + error.toString() + ' ===');
     throw error;
   }
 }
