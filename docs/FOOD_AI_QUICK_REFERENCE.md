@@ -16,8 +16,11 @@
 |--------|-------------|
 | **Predict Selected Items** | Select cells in Column A, then run |
 | **Predict All Empty Items** | Bulk predict all items without storage |
+| **📚 View Learning Data** | See what the system has learned from corrections |
+| **🗑️ Clear Learning Data** | Reset learned preferences |
 | **Setup Gemini API** | First-time setup or change API key |
 | **Test API Connection** | Verify your API key works |
+| **🔍 Full Diagnostic** | Troubleshoot API issues step-by-step |
 
 ---
 
@@ -45,7 +48,30 @@
 ```
 Milk          → fridge, 2nd shelf
 Carrots       → fridge, veggie drawer
-Ice cream     → freezer, (empty)
+Ice
+
+---
+
+## 🎓 Learning System
+
+**The system learns from your corrections!**
+
+1. **First prediction**: AI suggests storage
+2. **Wrong?** Manually edit columns D/E with correct values
+3. **Learned!** Next time, uses your correction instantly
+4. **Smarter predictions**: Similar items benefit from your examples
+
+**Benefits:**edit D/E - system learns! |
+| Rate limit | Wait 24 hours (1,500 free/day) |
+| Learning not working | Use "View Learning Data" to check |
+| Truncated JSON | maxOutputTokens set to 500 (fixedAPI call)
+- 🎯 More accurate over time
+- 💰 Reduces API usage
+- 🏠 Learns your household's preferences
+- **Setup Guide**: [FOOD_AI_SETUP.md](FOOD_AI_SETUP.md)
+- **Learning System**: [FOOD_AI_LEARNING.md](FOOD_AI_LEARNING.md)
+- **Architecture**: [FOOD_AI_ARCHITECTURE.md](FOOD_AI_ARCHITECTURE
+See [FOOD_AI_LEARNING.md](FOOD_AI_LEARNING.md) for details. cream     → freezer, (empty)
 Olive oil     → kitchen cabinet, (empty)
 Ground beef   → fridge, 4th shelf
 ```

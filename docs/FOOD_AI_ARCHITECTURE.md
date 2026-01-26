@@ -15,14 +15,18 @@
 │  Menu: 🍎 Food AI                                       │
 │  ├─ Predict Selected Items                              │
 │  ├─ Predict All Empty Items                             │
+│  ├─ 📚 View Learning Data                               │
+│  ├─ 🗑️ Clear Learning Data                             │
 │  ├─ Setup Gemini API                                    │
-│  └─ Test API Connection                                 │
+│  ├─ Test API Connection                                 │
+│  └─ 🔍 Full Diagnostic                                  │
 └────────────────────┬────────────────────────────────────┘
                      │
                      │ User clicks menu
                      ▼
 ┌─────────────────────────────────────────────────────────┐
-│         Google Apps Script (FoodExpirationAI.js)        │
+│         Google Apps Script                              │
+│    FoodExpirationAI.js + FoodAILearning.js             │
 │                                                          │
 │  Main Functions:                                        │
 │  ┌────────────────────────────────────────────────┐    │
@@ -36,24 +40,37 @@
 │                         ▼                               │
 │  ┌────────────────────────────────────────────────┐    │
 │  │  predictFoodStorage(foodItem)                  │    │
-│  │  - Builds AI prompt with constraints           │    │
-│  │  - Calls Gemini API via UrlFetchApp            │    │
-│  │  - Parses JSON response                        │    │
-│  │  - Validates storage method & section          │    │
-│  │  - Returns {storageMethod, fridgeSection}      │    │
+│  │                                                 │    │
+│  │  1. Check learned data (exact match)           │    │
+│  │     ├─ Found? → Return instantly ⚡             │    │
+│  │     └─ Not found? → Continue to Gemini         │    │
+│  │                                                 │    │
+│  │  2. Build prompt with learned examples         │    │
+│  │     (few-shot learning)                        │    │
+│  │                                                 │    │
+│  │  3. Call Gemini API via UrlFetchApp            │    │
+│  │                                                 │    │
+│  │  4. Parse JSON response                        │    │
+│  │                                                 │    │
+│  │  5. Validate storage method & section          │    │
+│  │                                                 │    │
+│  │  6. Record as learned data                     │    │
+│  │                                                 │    │
+│  │  7. Return {storageMethod, fridgeSection}      │    │
 │  └────────────────────────────────────────────────┘    │
 │                         │                               │
-│                         │ HTTP POST                     │
+│                         │ HTTP POST (if not cached)     │
 └─────────────────────────┼───────────────────────────────┘
                           │
                           ▼
 ┌─────────────────────────────────────────────────────────┐
 │              Google Gemini API (Cloud)                  │
 │                                                          │
-│  Model: gemini-1.5-flash                                │
-│  Endpoint: /v1beta/models/gemini-1.5-flash              │
+│  Model: gemini-2.5-flash                                │
+│  Endpoint: /v1beta/models/gemini-2.5-flash              │
 │                                                          │
 │  Input: "Predict storage for: Milk"                    │
+│         + Learned examples (if available)               │
 │  Output: {"storageMethod":"fridge",                     │
 │           "fridgeSection":"2nd shelf"}                  │
 │                                                          │
@@ -61,7 +78,21 @@
 │  - Natural language understanding                       │
 │  - Structured JSON output                               │
 │  - Food storage expertise                               │
+│  - Few-shot learning from examples                      │
 │  - Free tier: 1,500 requests/day                        │
+└─────────────────────────────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────┐
+│         Hidden Sheet: FoodAI_Learning                   │
+│                                                          │
+│  Columns:                                               │
+│  A: Food Item | B: Storage | C: Section | D: Date | E: Source │
+│                                                          │
+│  Auto-populated via:                                    │
+│  - AI predictions (source: 'ai-confirmed')              │
+│  - Manual corrections (source: 'manual')                │
+│  - onEdit() trigger captures user edits                 │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -336,16 +367,155 @@ All errors are:
 
 ---
 
+## Learning System Architecture
+
+### Storage & Retrieval Flow
+
+```
+┌─────────────────────────────────────────────────────────┐
+│          Prediction Request Flow                        │
+└─────────────────────────────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────┐
+│  Step 1: Check Learning Cache (FoodAI_Learning sheet)  │
+│                                                          │
+│  lookupLearnedStorage(foodItem)                         │
+│  ├─ Normalize: lowercase, trim                          │
+│  ├─ Search: exact match in Column A                     │
+│  └─ Result: {storageMethod, fridgeSection, source}      │
+└─────────────────────────────────────────────────────────┘
+                          │
+          ┌───────────────┴───────────────┐
+          │ Found?                        │ Not found?
+          ▼                               ▼
+┌─────────────────────┐    ┌──────────────────────────────┐
+│ Return instantly ⚡  │    │ Step 2: Build AI Prompt      │
+│ (No API call)       │    │                              │
+│ Source: 'learned'   │    │ buildPromptWithLearning()    │
+└─────────────────────┘    │ ├─ Get recent 5 examples     │
+                           │ ├─ Add to prompt context     │
+                           │ └─ Few-shot learning         │
+                           └──────────────────────────────┘
+                                          │
+                                          ▼
+                           ┌──────────────────────────────┐
+                           │ Step 3: Call Gemini API      │
+                           │                              │
+                           │ - Send prompt with examples  │
+                           │ - maxOutputTokens: 500       │
+                           │ - temperature: 0.1           │
+                           └──────────────────────────────┘
+                                          │
+                                          ▼
+                           ┌──────────────────────────────┐
+                           │ Step 4: Record Learning      │
+                           │                              │
+                           │ recordFoodLearning()         │
+                           │ - Source: 'ai-confirmed'     │
+                           │ - Timestamp: now()           │
+                           └──────────────────────────────┘
+```
+
+### Learning Capture Flow
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  User manually edits Column D or E                      │
+│  (Correcting a wrong prediction)                        │
+└─────────────────────────────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────┐
+│  onEdit(e) trigger fires                                │
+│                                                          │
+│  Checks:                                                │
+│  ✓ Sheet name = "Food Expiration"                       │
+│  ✓ Column edited = D or E                               │
+│  ✓ Row > 1 (not header)                                 │
+│  ✓ Column A has food name                               │
+│  ✓ Column D has valid storage method                    │
+└─────────────────────────────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────┐
+│  onEditCaptureLearning()                                │
+│                                                          │
+│  Captures:                                              │
+│  - Food item (from Column A)                            │
+│  - Storage method (from Column D)                       │
+│  - Fridge section (from Column E)                       │
+│  - Source: 'manual'                                     │
+└─────────────────────────────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────┐
+│  recordFoodLearning()                                   │
+│                                                          │
+│  Actions:                                               │
+│  1. Get/create FoodAI_Learning sheet                    │
+│  2. Check if food item already exists                   │
+│  3. If exists: Update row with new values               │
+│  4. If new: Append new row                              │
+│  5. Set timestamp = now()                               │
+└─────────────────────────────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────┐
+│  FoodAI_Learning Sheet Updated                          │
+│                                                          │
+│  Example Row:                                           │
+│  ┌────────┬─────────┬─────────┬───────────┬──────────┐ │
+│  │ Milk   │ fridge  │ 2nd     │ 1/25/2026 │ manual   │ │
+│  │        │         │ shelf   │ 5:10 PM   │          │ │
+│  └────────┴─────────┴─────────┴───────────┴──────────┘ │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Matching Strategy
+
+**Two-Tier Approach:**
+
+1. **Exact Match** (Deterministic)
+   - Case-insensitive string comparison
+   - "Milk" = "milk" = "MILK" = " Milk "
+   - O(n) lookup time (linear search)
+   - Zero latency once found
+
+2. **Semantic Match** (LLM-based)
+   - No exact match required
+   - Gemini receives learned examples
+   - LLM understands similarity:
+     - "Whole Milk" → learns from "Milk"
+     - "Greek Yogurt" → learns from "Yogurt"
+     - "Red Apple" → learns from "Apple"
+   - Few-shot learning improves accuracy
+
+**Example Scenarios:**
+
+| Food Item | Learning DB | Match Type | Result |
+|-----------|-------------|------------|--------|
+| Milk | "Milk" exists | Exact | Instant lookup |
+| milk | "Milk" exists | Exact | Instant lookup |
+| Oat Milk | "Milk" exists | Semantic | Gemini + example |
+| Greek Yogurt | "Yogurt" exists | Semantic | Gemini + example |
+| Banana | No match | None | Standard Gemini |
+
+---
+
 ## Performance Characteristics
 
 | Metric | Value | Notes |
 |--------|-------|-------|
-| **Single Prediction** | ~1 second | API latency + processing |
+| **Learned Item** | < 100ms | Instant sheet lookup |
+| **New Item (no examples)** | ~1 second | API latency + processing |
+| **New Item (with examples)** | ~1.2 seconds | Slightly slower prompt |
 | **Batch (10 items)** | ~10 seconds | With 500ms delay between |
 | **Batch (100 items)** | ~100 seconds | Sequential processing |
 | **Daily Limit (Free)** | 1,500 requests | Resets every 24 hours |
 | **API Response Size** | ~200 bytes | JSON response |
 | **Memory Usage** | Minimal | Stateless function calls |
+| **Learning Sheet Size** | ~50 bytes/row | Negligible storage |
 
 ---
 
@@ -369,9 +539,16 @@ All errors are:
 │     ✓ Response time < 3 seconds                     │
 │     ✓ No exceptions thrown                          │
 │                                                     │
+│ Learning System Tests:                              │
+│  - First prediction: verify 'ai-confirmed' recorded │
+│  - Manual correction: verify 'manual' recorded      │
+│  - Second prediction: verify instant lookup         │
+│  - Similar item: verify examples in prompt          │
+│                                                     │
 │ Manual Tests:                                       │
 │  - Various food types (produce, dairy, frozen)      │
 │  - Edge cases (empty strings, special chars)        │
 │  - Error scenarios (invalid API key, network off)   │
+│  - Learning persistence across sessions             │
 └─────────────────────────────────────────────────────┘
 ```
