@@ -11,6 +11,20 @@
 function predictFoodStorage(foodItem) {
   Logger.log('=== Starting predictFoodStorage for: ' + foodItem + ' ===');
 
+  // First, check if we've learned this food item before
+  const learned = lookupLearnedStorage(foodItem);
+  if (learned) {
+    Logger.log('Found learned storage for: ' + foodItem);
+    Logger.log('Using learned values: ' + JSON.stringify(learned));
+    return {
+      storageMethod: learned.storageMethod,
+      fridgeSection: learned.fridgeSection,
+      source: 'learned'
+    };
+  }
+
+  Logger.log('No learned data found, querying Gemini...');
+
   const apiKey = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
 
   if (!apiKey) {
@@ -19,33 +33,8 @@ function predictFoodStorage(foodItem) {
 
   Logger.log('API key found');
 
-  const prompt = `You are a food storage expert. Given a food item, predict the best storage method and location.
-
-Food item: "${foodItem}"
-
-Available storage methods:
-- fridge
-- freezer
-- kitchen cabinet
-- food cabinet
-- cake stand
-
-If storage method is "fridge", also specify the section from:
-- 1st shelf (top shelf)
-- 2nd shelf
-- 3rd shelf
-- 4th shelf
-- veggie drawer
-- fruit drawer
-
-If storage method is NOT "fridge", set fridgeSection to empty string.
-
-IMPORTANT: Respond with ONLY a valid JSON object, nothing else. No explanations, no markdown. Just the JSON.
-Format: {"storageMethod": "method", "fridgeSection": "section or empty string"}
-
-Example responses:
-{"storageMethod": "fridge", "fridgeSection": "2nd shelf"}
-{"storageMethod": "freezer", "fridgeSection": ""}`;
+  // Build prompt with learned examples for few-shot learning
+  const prompt = buildPromptWithLearning(foodItem);
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
@@ -164,6 +153,10 @@ Example responses:
     if (prediction.storageMethod !== 'fridge') {
       prediction.fridgeSection = '';
     }
+
+
+    // Record this AI prediction as learned data (user can correct later)
+    recordFoodLearning(foodItem, prediction.storageMethod, prediction.fridgeSection, 'ai-confirmed');
 
     Logger.log('=== Prediction successful: ' + JSON.stringify(prediction) + ' ===');
     return prediction;

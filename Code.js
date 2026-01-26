@@ -34,11 +34,23 @@ function onOpen() {
       .addItem('Predict Selected Items', 'predictSelectedFoodStorage')
       .addItem('Predict All Empty Items', 'predictAllEmptyFoodStorage')
       .addSeparator()
+      .addItem('📚 View Learning Data', 'viewFoodLearning')
+      .addItem('🗑️ Clear Learning Data', 'clearFoodLearning')
+      .addSeparator()
       .addItem('Setup Gemini API', 'setupGeminiAPI')
       .addItem('Test API Connection', 'testGeminiAPI')
       .addItem('🔍 Full Diagnostic', 'diagnosticTestFull')
       .addToUi();
   }
+}
+
+/**
+ * Simple trigger for capturing manual edits
+ * Automatically installed by Apps Script when sheet is opened
+ */
+function onEdit(e) {
+  // Capture learning data when user manually edits predictions
+  onEditCaptureLearning(e);
 }
 
 /**
